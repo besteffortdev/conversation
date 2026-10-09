@@ -95,6 +95,7 @@ public class Message extends AbstractEntity
     public static final String DELETED = "deleted";
     public static final String OCCUPANT_ID = "occupantId";
     public static final String REACTIONS = "reactions";
+    public static final String RETRACTED = "retracted";
     public static final String ME_COMMAND = "/me ";
 
     public static final String ERROR_MESSAGE_CANCELLED = "eu.siacs.conversations.cancelled";
@@ -110,6 +111,7 @@ public class Message extends AbstractEntity
     protected int status;
     protected int type;
     protected boolean deleted = false;
+    protected boolean retracted = false;
     protected boolean carbon = false;
     protected boolean oob = false;
     protected List<Edit> edits = Collections.emptyList();
@@ -263,6 +265,13 @@ public class Message extends AbstractEntity
 
     public static Message fromCursor(
             final Context context, final Cursor cursor, final Conversation conversation) {
+        final Message message = fromCursorWithoutRetraction(context, cursor, conversation);
+        message.retracted = retractedFromCursor(cursor);
+        return message;
+    }
+
+    private static Message fromCursorWithoutRetraction(
+            final Context context, final Cursor cursor, final Conversation conversation) {
         return new Message(
                 conversation,
                 cursor.getString(cursor.getColumnIndexOrThrow(UUID)),
@@ -290,6 +299,11 @@ public class Message extends AbstractEntity
                 cursor.getString(cursor.getColumnIndexOrThrow(BODY_LANGUAGE)),
                 cursor.getString(cursor.getColumnIndexOrThrow(OCCUPANT_ID)),
                 Reaction.fromString(cursor.getString(cursor.getColumnIndexOrThrow(REACTIONS))));
+    }
+
+    protected static boolean retractedFromCursor(final Cursor cursor) {
+        final int index = cursor.getColumnIndex(RETRACTED);
+        return index >= 0 && cursor.getInt(index) > 0;
     }
 
     protected static StorageLocation storageLocationFromCursor(
@@ -376,6 +390,7 @@ public class Message extends AbstractEntity
         values.put(BODY_LANGUAGE, bodyLanguage);
         values.put(OCCUPANT_ID, occupantId);
         values.put(REACTIONS, Reaction.toString(this.reactions));
+        values.put(RETRACTED, retracted ? 1 : 0);
         return values;
     }
 
@@ -515,6 +530,44 @@ public class Message extends AbstractEntity
 
     public void setDeleted(boolean deleted) {
         this.deleted = deleted;
+    }
+
+    /**
+     * @return whether the message was retracted (XEP-0424) and only remains as a tombstone
+     */
+    public boolean isRetracted() {
+        return this.retracted;
+    }
+
+    /**
+     * Turns the message into a tombstone: the content (including previous versions of corrected
+     * messages, file references and reactions) is wiped; ids are kept to match later references.
+     */
+    public synchronized void retract() {
+        this.retracted = true;
+        this.setBody("");
+        this.encryptedBody = null;
+        this.type = TYPE_TEXT;
+        this.encryption = ENCRYPTION_NONE;
+        this.axolotlFingerprint = null;
+        this.oob = false;
+        this.storageLocation = null;
+        this.transferable = null;
+        this.fileParams = null;
+        this.bodyLanguage = null;
+        this.reactions = Collections.emptyList();
+        this.edits =
+                ImmutableList.copyOf(
+                        Collections2.transform(
+                                Collections2.filter(this.edits, Objects::nonNull),
+                                e ->
+                                        new Edit(
+                                                e.id(),
+                                                e.serverMsgId(),
+                                                e.sentAt(),
+                                                null,
+                                                null,
+                                                null)));
     }
 
     public void markRead() {
@@ -884,6 +937,19 @@ public class Message extends AbstractEntity
 
     public Collection<String> getEditedServerMessageIds() {
         return Collections2.transform(this.edits, Edit::serverMsgId);
+    }
+
+    public Collection<String> getEditedIds() {
+        return Collections2.transform(Collections2.filter(this.edits, Objects::nonNull), Edit::id);
+    }
+
+    public boolean hasPreviousVersionWithId(final String id) {
+        for (final Edit edit : this.edits) {
+            if (edit != null && id.equals(edit.id())) {
+                return true;
+            }
+        }
+        return false;
     }
 
     public void setOob(boolean isOob) {

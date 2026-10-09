@@ -373,6 +373,27 @@ public class DatabaseBackend extends SQLiteOpenHelper {
     }
 
     @Override
+    public void onOpen(final SQLiteDatabase db) {
+        super.onOpen(db);
+        // columns added by this fork are created on demand instead of through a DATABASE_VERSION
+        // bump, so that upstream migrations with the same version number are never skipped
+        addColumnIfMissing(db, Message.TABLENAME, Message.RETRACTED, "NUMBER DEFAULT 0");
+    }
+
+    private static void addColumnIfMissing(
+            final SQLiteDatabase db, final String table, final String column, final String type) {
+        try (final Cursor cursor = db.rawQuery("PRAGMA table_info(" + table + ")", null)) {
+            final int nameIndex = cursor.getColumnIndexOrThrow("name");
+            while (cursor.moveToNext()) {
+                if (column.equals(cursor.getString(nameIndex))) {
+                    return;
+                }
+            }
+        }
+        db.execSQL("ALTER TABLE " + table + " ADD COLUMN " + column + " " + type);
+    }
+
+    @Override
     public void onCreate(SQLiteDatabase db) {
         db.execSQL(
                 "create table "

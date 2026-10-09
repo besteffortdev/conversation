@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- strings added by this fork; kept separate from strings.xml to avoid conflicts with upstream -->
+<resources>
+    <string name="retract_message">Delete for everyone</string>
+    <string name="retract_message_question">Delete for everyone?</string>
+    <string name="retract_message_explanation">This message will be deleted for everyone in this chat. People may have already seen it, and apps that don’t support deleting messages will keep showing it.</string>
+    <string name="could_not_retract_message">Could not delete message</string>
+    <string name="message_retracted">This message was deleted</string>
+    <string name="message_retracted_by_you">You deleted this message</string>
+</resources>
