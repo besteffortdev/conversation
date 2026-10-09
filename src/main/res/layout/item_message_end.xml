@@ -30,7 +30,7 @@
             app:layout_constrainedWidth="true"
             app:layout_constraintEnd_toStartOf="@id/message_photo"
             app:layout_constraintHorizontal_bias="1.0"
-            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintStart_toEndOf="@+id/add_reaction_button"
             app:layout_constraintTop_toTopOf="parent">
 
             <LinearLayout
@@ -119,6 +119,23 @@
             app:layout_constraintHorizontal_bias="1.0"
             app:layout_constraintStart_toStartOf="parent"
             app:layout_constraintTop_toBottomOf="@+id/reactions_anchor" />
+
+        <ImageButton
+            android:id="@+id/add_reaction_button"
+            android:layout_width="@dimen/bubble_add_reaction_button_size"
+            android:layout_height="@dimen/bubble_add_reaction_button_size"
+            android:layout_marginBottom="4dp"
+            android:background="?selectableItemBackgroundBorderless"
+            android:contentDescription="@string/add_reaction"
+            android:padding="@dimen/bubble_add_reaction_button_padding"
+            android:src="@drawable/ic_add_reaction_24dp"
+            android:visibility="gone"
+            app:layout_constraintBottom_toBottomOf="@id/message_box"
+            app:layout_constraintEnd_toStartOf="@id/message_box"
+            app:layout_constraintHorizontal_bias="1.0"
+            app:layout_constraintHorizontal_chainStyle="packed"
+            app:layout_constraintStart_toStartOf="parent"
+            app:tint="?colorOutline" />
 
     </androidx.constraintlayout.widget.ConstraintLayout>
 </layout>

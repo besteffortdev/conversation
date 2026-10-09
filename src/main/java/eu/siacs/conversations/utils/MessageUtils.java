@@ -30,11 +30,14 @@
 package eu.siacs.conversations.utils;
 
 import com.google.common.base.Strings;
+import eu.siacs.conversations.entities.Conversation;
 import eu.siacs.conversations.entities.Conversational;
 import eu.siacs.conversations.entities.Message;
+import eu.siacs.conversations.entities.Transferable;
 import eu.siacs.conversations.http.AesGcmURL;
 import eu.siacs.conversations.http.URL;
 import eu.siacs.conversations.ui.util.QuoteHelper;
+import im.conversations.android.xmpp.model.reactions.Restrictions;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.util.regex.Pattern;
@@ -116,5 +119,31 @@ public class MessageUtils {
                 && message.isOOb()
                 && message.getFileParams().size != null
                 && message.getFileParams().url != null;
+    }
+
+    public static boolean canAddReaction(final Message message) {
+        if (message.getType() == Message.TYPE_STATUS
+                || message.getType() == Message.TYPE_RTP_SESSION
+                || message.getStatus() == Message.STATUS_SEND_FAILED
+                || message.isDeleted()
+                || message.getEncryption() == Message.ENCRYPTION_AXOLOTL_NOT_FOR_THIS_DEVICE
+                || message.getEncryption() == Message.ENCRYPTION_AXOLOTL_FAILED) {
+            return false;
+        }
+        final Transferable transferable = message.getTransferable();
+        if (message.getStatus() == Message.STATUS_RECEIVED
+                && transferable != null
+                && (transferable.getStatus() == Transferable.STATUS_CANCELLED
+                        || transferable.getStatus() == Transferable.STATUS_FAILED)) {
+            return false;
+        }
+        if (message.getConversation() instanceof Conversation c) {
+            final var singleOrOccupantId =
+                    c.getMode() == Conversational.MODE_SINGLE
+                            || (c.getMucOptions().occupantId()
+                                    && c.getMucOptions().participating());
+            return singleOrOccupantId && Restrictions.reactionsPerUserRemaining(message);
+        }
+        return false;
     }
 }

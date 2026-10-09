@@ -24,6 +24,7 @@ import android.view.View;
 import android.view.ViewGroup;
 import android.view.WindowManager;
 import android.widget.ArrayAdapter;
+import android.widget.ImageButton;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.RelativeLayout;
@@ -124,6 +125,7 @@ public class MessageAdapter extends ArrayAdapter<Message> {
     private OnContactPictureLongClicked mOnContactPictureLongClickedListener;
     private BubbleDesign bubbleDesign = new BubbleDesign(false, false, false, true, true);
     private final boolean mForceNames;
+    private boolean showAddReactionButton = false;
 
     public MessageAdapter(
             final XmppActivity activity, final List<Message> messages, final boolean forceNames) {
@@ -167,6 +169,10 @@ public class MessageAdapter extends ArrayAdapter<Message> {
 
     public void setOnContactPictureLongClicked(OnContactPictureLongClicked listener) {
         this.mOnContactPictureLongClickedListener = listener;
+    }
+
+    public void setShowAddReactionButton(final boolean showAddReactionButton) {
+        this.showAddReactionButton = showAddReactionButton;
     }
 
     @Override
@@ -1022,6 +1028,11 @@ public class MessageAdapter extends ArrayAdapter<Message> {
         setBackgroundTint(viewHolder.messageBox(), bubbleColor);
         setTextColor(viewHolder.messageBody(), bubbleColor);
 
+        final boolean addReactionButton =
+                this.showAddReactionButton && MessageUtils.canAddReaction(message);
+        viewHolder.addReactionButton().setVisibility(addReactionButton ? View.VISIBLE : View.GONE);
+        viewHolder.addReactionButton().setOnClickListener(v -> addReaction(message));
+
         if (received && viewHolder instanceof StartBubbleMessageItemViewHolder startViewHolder) {
             setTextColor(startViewHolder.encryption(), bubbleColor);
             if (isInValidSession) {
@@ -1037,7 +1048,8 @@ public class MessageAdapter extends ArrayAdapter<Message> {
                 }
             }
             final boolean remaining = Restrictions.reactionsPerUserRemaining(message);
-            if (remaining) {
+            // the add reaction button next to the bubble replaces the trailing add reaction chip
+            if (remaining && !addReactionButton) {
                 BindingAdapters.setReactionsOnReceived(
                         viewHolder.reactions(),
                         message.getAggregatedReactions(),
@@ -1608,6 +1620,8 @@ public class MessageAdapter extends ArrayAdapter<Message> {
         protected abstract ImageView contactPicture();
 
         protected abstract ChipGroup reactions();
+
+        protected abstract ImageButton addReactionButton();
     }
 
     private static class StartBubbleMessageItemViewHolder extends BubbleMessageItemViewHolder {
@@ -1681,6 +1695,11 @@ public class MessageAdapter extends ArrayAdapter<Message> {
         protected ChipGroup reactions() {
             return this.binding.reactions;
         }
+
+        @Override
+        protected ImageButton addReactionButton() {
+            return this.binding.addReactionButton;
+        }
     }
 
     private static class EndBubbleMessageItemViewHolder extends BubbleMessageItemViewHolder {
@@ -1750,6 +1769,11 @@ public class MessageAdapter extends ArrayAdapter<Message> {
         @Override
         protected ChipGroup reactions() {
             return this.binding.reactions;
+        }
+
+        @Override
+        protected ImageButton addReactionButton() {
+            return this.binding.addReactionButton;
         }
     }
 
