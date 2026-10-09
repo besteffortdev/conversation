@@ -135,6 +135,13 @@ public class UIHelper {
         return getMessagePreview(context, message, null, ' ');
     }
 
+    public static String getRetractedText(final Context context, final Message message) {
+        return context.getString(
+                message.getStatus() == Message.STATUS_RECEIVED
+                        ? R.string.message_retracted
+                        : R.string.message_retracted_by_you);
+    }
+
     public static Pair<CharSequence, Boolean> getMessagePreview(
             final Context context, final Message message, final char separator) {
         return getMessagePreview(context, message, null, separator);
@@ -150,6 +157,9 @@ public class UIHelper {
             final Message message,
             final @Nullable @ColorInt Integer textColor,
             @Nullable final Character separator) {
+        if (message.isRetracted()) {
+            return new Pair<>(getRetractedText(context, message), true);
+        }
         final Transferable d = message.getTransferable();
         if (d != null) {
             switch (d.getStatus()) {
@@ -483,8 +493,8 @@ public class UIHelper {
     }
 
     /**
-     * Display names that are themselves the address of a user on another server (for example a
-     * nick or roster name of 'user@other.example') are reduced to the local part.
+     * Display names that are themselves the address of a user on another server (for example a nick
+     * or roster name of 'user@other.example') are reduced to the local part.
      */
     public static String shortenForeignAddress(final String displayName, final Account account) {
         final Jid address = asUserAddress(displayName);

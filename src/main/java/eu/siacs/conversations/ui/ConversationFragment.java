@@ -160,6 +160,7 @@ import eu.siacs.conversations.xmpp.manager.MessageArchiveManager;
 import eu.siacs.conversations.xmpp.manager.ModerationManager;
 import eu.siacs.conversations.xmpp.manager.MultiUserChatManager;
 import eu.siacs.conversations.xmpp.manager.PresenceManager;
+import eu.siacs.conversations.xmpp.manager.RetractionManager;
 import im.conversations.android.model.AttachmentChoice;
 import im.conversations.android.provider.ApplicationProvider;
 import im.conversations.android.provider.VCardProvider;
@@ -1568,7 +1569,8 @@ public class ConversationFragment extends XmppFragment
         if (m.getType() != Message.TYPE_STATUS && m.getType() != Message.TYPE_RTP_SESSION) {
 
             if (m.getEncryption() == Message.ENCRYPTION_AXOLOTL_NOT_FOR_THIS_DEVICE
-                    || m.getEncryption() == Message.ENCRYPTION_AXOLOTL_FAILED) {
+                    || m.getEncryption() == Message.ENCRYPTION_AXOLOTL_FAILED
+                    || m.isRetracted()) {
                 return;
             }
 
@@ -1644,6 +1646,7 @@ public class ConversationFragment extends XmppFragment
                     moderateMessage.setVisible(false);
                 }
                 addReaction.setVisible(MessageUtils.canAddReaction(m));
+                menu.findItem(R.id.retract_message).setVisible(RetractionManager.isRetractable(m));
                 moderateMessage.setTitle(
                         isAckedModerationDisclaimer()
                                 ? R.string.moderate_delete
@@ -1801,6 +1804,9 @@ public class ConversationFragment extends XmppFragment
             return true;
         } else if (itemId == R.id.moderation) {
             moderate(selectedMessage);
+            return true;
+        } else if (itemId == R.id.retract_message) {
+            retractMessage(selectedMessage);
             return true;
         } else if (itemId == R.id.show_error_message) {
             showErrorMessage(selectedMessage);
@@ -2577,6 +2583,29 @@ public class ConversationFragment extends XmppFragment
                     }
                 },
                 ContextCompat.getMainExecutor(requireContext()));
+    }
+
+    private void retractMessage(final Message message) {
+        final MaterialAlertDialogBuilder builder =
+                new MaterialAlertDialogBuilder(requireActivity());
+        builder.setTitle(R.string.retract_message_question);
+        builder.setMessage(R.string.retract_message_explanation);
+        builder.setNegativeButton(R.string.cancel, null);
+        builder.setPositiveButton(
+                R.string.delete,
+                (dialog, which) -> {
+                    final var connection =
+                            message.getConversation().getAccount().getXmppConnection();
+                    if (connection == null
+                            || !connection.getManager(RetractionManager.class).retract(message)) {
+                        Toast.makeText(
+                                        requireActivity(),
+                                        R.string.could_not_retract_message,
+                                        Toast.LENGTH_LONG)
+                                .show();
+                    }
+                });
+        builder.create().show();
     }
 
     private void moderate(final Message message) {

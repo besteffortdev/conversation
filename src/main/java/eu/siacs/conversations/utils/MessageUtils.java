@@ -126,6 +126,7 @@ public class MessageUtils {
                 || message.getType() == Message.TYPE_RTP_SESSION
                 || message.getStatus() == Message.STATUS_SEND_FAILED
                 || message.isDeleted()
+                || message.isRetracted()
                 || message.getEncryption() == Message.ENCRYPTION_AXOLOTL_NOT_FOR_THIS_DEVICE
                 || message.getEncryption() == Message.ENCRYPTION_AXOLOTL_FAILED) {
             return false;

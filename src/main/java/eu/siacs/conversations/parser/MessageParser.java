@@ -35,6 +35,7 @@ import eu.siacs.conversations.xmpp.manager.ModerationManager;
 import eu.siacs.conversations.xmpp.manager.MultiUserChatManager;
 import eu.siacs.conversations.xmpp.manager.PubSubManager;
 import eu.siacs.conversations.xmpp.manager.ReactionManager;
+import eu.siacs.conversations.xmpp.manager.RetractionManager;
 import eu.siacs.conversations.xmpp.manager.RosterManager;
 import eu.siacs.conversations.xmpp.manager.StanzaIdManager;
 import im.conversations.android.xmpp.model.Extension;
@@ -351,21 +352,22 @@ public class MessageParser extends AbstractParser
                 return;
             }
         }
+        // XEP-0424: the body of a retraction must never be displayed, fallback indication or not
+        final boolean isRetraction = packet.hasExtension(Retract.class);
         final boolean bodyIsFallback;
         if (body != null && packet.hasExtension(Reactions.class)) {
             final var range = Fallback.get(packet, Reactions.class, Body.class);
             bodyIsFallback = range.isPresent() && range.get().isEntire(body);
-        } else if (body != null && packet.hasExtension(Retract.class)) {
-            final var range = Fallback.get(packet, Retract.class, Body.class);
-            bodyIsFallback = range.isPresent() && range.get().isEntire(body);
         } else {
-            bodyIsFallback = false;
+            bodyIsFallback = isRetraction;
         }
 
-        if ((body != null && !bodyIsFallback)
-                || pgpEncrypted != null
-                || (axolotlEncrypted != null && axolotlEncrypted.hasExtension(Payload.class))
-                || oobUrl != null) {
+        if (!isRetraction
+                && ((body != null && !bodyIsFallback)
+                        || pgpEncrypted != null
+                        || (axolotlEncrypted != null
+                                && axolotlEncrypted.hasExtension(Payload.class))
+                        || oobUrl != null)) {
             final boolean conversationIsProbablyMuc =
                     isTypeGroupChat
                             || mucUserElement != null
@@ -812,8 +814,12 @@ public class MessageParser extends AbstractParser
 
             if (original.hasExtension(Retract.class)
                     && originalFrom != null
-                    && originalFrom.isBareJid()) {
+                    && originalFrom.isBareJid()
+                    && original.getType()
+                            == im.conversations.android.xmpp.model.stanza.Message.Type.GROUPCHAT) {
                 getManager(ModerationManager.class).handleRetraction(original);
+            } else if (isRetraction) {
+                getManager(RetractionManager.class).processRetraction(packet, counterpart, query);
             }
 
             // end no body

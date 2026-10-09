@@ -399,6 +399,18 @@ public class Conversation extends AbstractEntity
         return null;
     }
 
+    public Message findMessageWithPreviousVersion(final String id, final boolean received) {
+        synchronized (this.messages) {
+            for (final var message : this.messages) {
+                if ((message.getStatus() == Message.STATUS_RECEIVED) == received
+                        && message.hasPreviousVersionWithId(id)) {
+                    return message;
+                }
+            }
+        }
+        return null;
+    }
+
     public Message findSentMessageWithUuid(String id) {
         synchronized (this.messages) {
             for (Message message : this.messages) {

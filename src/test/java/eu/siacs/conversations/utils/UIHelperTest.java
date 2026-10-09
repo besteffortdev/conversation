@@ -17,7 +17,8 @@ public class UIHelperTest {
     @Test
     public void foreignAddressIsShortened() {
         Assert.assertEquals(
-                "2508-user", UIHelper.shortenForeignAddress("2508-user@2508-xmpp.core.net", account));
+                "2508-user",
+                UIHelper.shortenForeignAddress("2508-user@2508-xmpp.core.net", account));
     }
 
     @Test
@@ -40,7 +41,8 @@ public class UIHelperTest {
 
     @Test
     public void invalidAddressesAreKept() {
-        Assert.assertEquals("@other.example", UIHelper.shortenForeignAddress("@other.example", account));
+        Assert.assertEquals(
+                "@other.example", UIHelper.shortenForeignAddress("@other.example", account));
         Assert.assertEquals("user@", UIHelper.shortenForeignAddress("user@", account));
         Assert.assertNull(UIHelper.shortenForeignAddress(null, account));
     }

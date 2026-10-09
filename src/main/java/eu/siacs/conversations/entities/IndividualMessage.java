@@ -122,6 +122,15 @@ public class IndividualMessage extends Message {
 
     public static Message fromCursor(
             final Context context, final Cursor cursor, final Conversational conversation) {
+        final Message message = fromCursorWithoutRetraction(context, cursor, conversation);
+        if (message != null) {
+            message.retracted = retractedFromCursor(cursor);
+        }
+        return message;
+    }
+
+    private static Message fromCursorWithoutRetraction(
+            final Context context, final Cursor cursor, final Conversational conversation) {
         Jid jid;
         try {
             String value = cursor.getString(cursor.getColumnIndexOrThrow(COUNTERPART));

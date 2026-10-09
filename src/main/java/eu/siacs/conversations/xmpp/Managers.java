@@ -38,6 +38,7 @@ import eu.siacs.conversations.xmpp.manager.PubSubManager;
 import eu.siacs.conversations.xmpp.manager.PushNotificationManager;
 import eu.siacs.conversations.xmpp.manager.ReactionManager;
 import eu.siacs.conversations.xmpp.manager.RegistrationManager;
+import eu.siacs.conversations.xmpp.manager.RetractionManager;
 import eu.siacs.conversations.xmpp.manager.RosterManager;
 import eu.siacs.conversations.xmpp.manager.StanzaIdManager;
 import eu.siacs.conversations.xmpp.manager.StreamHostManager;
@@ -95,6 +96,7 @@ public class Managers {
                         new PushNotificationManager(context, connection))
                 .put(ReactionManager.class, new ReactionManager(context, connection))
                 .put(RegistrationManager.class, new RegistrationManager(context, connection))
+                .put(RetractionManager.class, new RetractionManager(context, connection))
                 .put(RosterManager.class, new RosterManager(context, connection))
                 .put(StanzaIdManager.class, new StanzaIdManager(context, connection))
                 .put(StreamHostManager.class, new StreamHostManager(context, connection))

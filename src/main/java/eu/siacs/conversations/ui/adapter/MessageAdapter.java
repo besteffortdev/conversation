@@ -281,7 +281,7 @@ public class MessageAdapter extends ArrayAdapter<Message> {
             viewHolder.indicatorSecurity().setVisibility(View.VISIBLE);
         }
 
-        if (message.edited()) {
+        if (message.edited() && !message.isRetracted()) {
             viewHolder.indicatorEdit().setVisibility(View.VISIBLE);
             if (error && sent) {
                 setImageTintError(viewHolder.indicatorEdit());
@@ -968,7 +968,10 @@ public class MessageAdapter extends ArrayAdapter<Message> {
 
         final Transferable transferable = message.getTransferable();
         final boolean unInitiatedButKnownSize = MessageUtils.unInitiatedButKnownSize(message);
-        if (unInitiatedButKnownSize
+        if (message.isRetracted()) {
+            displayInfoMessage(
+                    viewHolder, UIHelper.getRetractedText(activity, message), bubbleColor);
+        } else if (unInitiatedButKnownSize
                 || message.isDeleted()
                 || (transferable != null
                         && transferable.getStatus() != Transferable.STATUS_UPLOADING)) {
