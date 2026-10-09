@@ -46,8 +46,10 @@
     <dimen name="bubble_vertical_padding_minimum">1dp</dimen>
     <dimen name="bubble_avatar_size">48dp</dimen>
     <dimen name="bubble_avatar_distance">6dp</dimen>
-    <dimen name="bubble_add_reaction_button_size">32dp</dimen>
-    <dimen name="bubble_add_reaction_button_padding">6dp</dimen>
+    <dimen name="message_options_width">240dp</dimen>
+    <dimen name="message_options_emoji_size">44dp</dimen>
+    <dimen name="message_options_reactions_padding">4dp</dimen>
+    <dimen name="message_options_gutter">8dp</dimen>
 
     <!-- will get overwritten with 'true' on screens larger than w384dp -->
     <bool name="last_seen_full_text">false</bool>
