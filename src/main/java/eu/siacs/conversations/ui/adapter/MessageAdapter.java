@@ -100,8 +100,10 @@ import java.time.temporal.ChronoUnit;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.Date;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
+import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -118,6 +120,7 @@ public class MessageAdapter extends ArrayAdapter<Message> {
     private static final int RTP_SESSION = 4;
     private final XmppActivity activity;
     private final AudioPlayer audioPlayer;
+    private final Set<String> messagesShowingSenderAddress = new HashSet<>();
     private List<String> highlightedTerm = null;
     private final DisplayMetrics metrics;
     private OnContactPictureClicked mOnContactPictureClickedListener;
@@ -203,9 +206,6 @@ public class MessageAdapter extends ArrayAdapter<Message> {
         final boolean error;
         final Transferable transferable = message.getTransferable();
         final boolean sent = status != Message.STATUS_RECEIVED;
-        final boolean showUserNickname =
-                message.getConversation().getMode() == Conversation.MODE_MULTI
-                        && viewHolder instanceof StartBubbleMessageItemViewHolder;
         final String fileSize;
         if (message.isFileOrImage()
                 || transferable != null
@@ -304,10 +304,10 @@ public class MessageAdapter extends ArrayAdapter<Message> {
         final String bodyLanguage = message.getBodyLanguage();
         final ImmutableList.Builder<String> timeInfoBuilder = new ImmutableList.Builder<>();
 
-        if (mForceNames || showUserNickname) {
-            final String displayName = UIHelper.getMessageDisplayName(message);
-            if (displayName != null) {
-                timeInfoBuilder.add(displayName);
+        if (showSenderName(message, viewHolder)) {
+            final String senderName = getSenderName(message);
+            if (senderName != null) {
+                timeInfoBuilder.add(senderName);
             }
         }
         if (fileSize != null) {
@@ -325,6 +325,46 @@ public class MessageAdapter extends ArrayAdapter<Message> {
         }
         final var timeInfo = timeInfoBuilder.build();
         viewHolder.time().setText(Joiner.on(" · ").join(timeInfo));
+    }
+
+    private boolean showSenderName(
+            final Message message, final BubbleMessageItemViewHolder viewHolder) {
+        return mForceNames
+                || (message.getConversation().getMode() == Conversation.MODE_MULTI
+                        && viewHolder instanceof StartBubbleMessageItemViewHolder);
+    }
+
+    @Nullable
+    private String getSenderName(final Message message) {
+        if (messagesShowingSenderAddress.contains(message.getUuid())) {
+            final String senderAddress = UIHelper.getMessageSenderAddress(message);
+            if (senderAddress != null) {
+                return senderAddress;
+            }
+        }
+        return UIHelper.shortenForeignAddress(
+                UIHelper.getMessageDisplayName(message), message.getConversation().getAccount());
+    }
+
+    private boolean canToggleSenderAddress(
+            final Message message, final BubbleMessageItemViewHolder viewHolder) {
+        if (!showSenderName(message, viewHolder)) {
+            return false;
+        }
+        final String senderAddress = UIHelper.getMessageSenderAddress(message);
+        return senderAddress != null
+                && !senderAddress.equals(
+                        UIHelper.shortenForeignAddress(
+                                UIHelper.getMessageDisplayName(message),
+                                message.getConversation().getAccount()));
+    }
+
+    private void toggleSenderAddress(final Message message) {
+        final String uuid = message.getUuid();
+        if (!messagesShowingSenderAddress.remove(uuid)) {
+            messagesShowingSenderAddress.add(uuid);
+        }
+        notifyDataSetChanged();
     }
 
     public static @DrawableRes Integer getMessageStatusAsDrawable(
@@ -505,7 +545,7 @@ public class MessageAdapter extends ArrayAdapter<Message> {
             viewHolder.messageBody().setTextIsSelectable(false);
             return;
         }
-        final String nick = UIHelper.getMessageDisplayName(message);
+        final String nick = getSenderName(message);
         final boolean hasMeCommand = message.hasMeCommand();
         final var trimmedBody = rawBody.trim();
         final SpannableStringBuilder body;
@@ -896,6 +936,13 @@ public class MessageAdapter extends ArrayAdapter<Message> {
         viewHolder.messageBox().setClipToOutline(true);
 
         resetClickListener(viewHolder.messageBox(), viewHolder.messageBody());
+        // tapping the bubble toggles between the short sender name and the full address. message
+        // types with their own click action (media, downloads, ...) override this further down
+        if (canToggleSenderAddress(message, viewHolder)) {
+            final View.OnClickListener toggleSenderAddress = v -> toggleSenderAddress(message);
+            viewHolder.messageBox().setOnClickListener(toggleSenderAddress);
+            viewHolder.messageBody().setOnClickListener(toggleSenderAddress);
+        }
 
         viewHolder
                 .contactPicture()

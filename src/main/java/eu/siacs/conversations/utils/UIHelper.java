@@ -482,6 +482,61 @@ public class UIHelper {
         }
     }
 
+    /**
+     * Display names that are themselves the address of a user on another server (for example a
+     * nick or roster name of 'user@other.example') are reduced to the local part.
+     */
+    public static String shortenForeignAddress(final String displayName, final Account account) {
+        final Jid address = asUserAddress(displayName);
+        if (address == null || address.getDomain().equals(account.getDomain())) {
+            return displayName;
+        }
+        return address.getLocal();
+    }
+
+    /**
+     * @return the full address of the sender: the display name if that already is an address,
+     *     otherwise the real address if known
+     */
+    @Nullable
+    public static String getMessageSenderAddress(final Message message) {
+        final String displayName = getMessageDisplayName(message);
+        if (asUserAddress(displayName) != null) {
+            return displayName;
+        }
+        final Conversational conversation = message.getConversation();
+        final Jid address;
+        if (message.getStatus() == Message.STATUS_RECEIVED) {
+            if (conversation.getMode() == Conversation.MODE_MULTI) {
+                if (conversation instanceof Conversation c) {
+                    address = c.getMucOptions().getUserOrStub(message).getRealJid();
+                } else {
+                    address = message.getTrueCounterpart();
+                }
+            } else {
+                address = message.getCounterpart();
+            }
+        } else {
+            address = conversation.getAccount().getJid();
+        }
+        return address == null || address.getLocal() == null
+                ? null
+                : address.asBareJid().toString();
+    }
+
+    @Nullable
+    private static Jid asUserAddress(@Nullable final String name) {
+        if (name == null || name.indexOf('@') <= 0) {
+            return null;
+        }
+        try {
+            final Jid address = Jid.of(name);
+            return address.getLocal() == null ? null : address;
+        } catch (final IllegalArgumentException e) {
+            return null;
+        }
+    }
+
     public static String getMessageHint(final Context context, final Conversation conversation) {
         return switch (conversation.getNextEncryption()) {
             case Message.ENCRYPTION_NONE -> context.getString(R.string.send_unencrypted_message);
