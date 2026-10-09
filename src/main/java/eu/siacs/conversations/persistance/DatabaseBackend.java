@@ -378,6 +378,7 @@ public class DatabaseBackend extends SQLiteOpenHelper {
         // columns added by this fork are created on demand instead of through a DATABASE_VERSION
         // bump, so that upstream migrations with the same version number are never skipped
         addColumnIfMissing(db, Message.TABLENAME, Message.RETRACTED, "NUMBER DEFAULT 0");
+        PendingRetractions.createTable(db);
     }
 
     private static void addColumnIfMissing(
