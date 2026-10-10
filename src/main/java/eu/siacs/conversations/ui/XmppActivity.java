@@ -68,6 +68,7 @@ import eu.siacs.conversations.entities.Contact;
 import eu.siacs.conversations.entities.Conversation;
 import eu.siacs.conversations.entities.Conversational;
 import eu.siacs.conversations.entities.Message;
+import eu.siacs.conversations.services.AppConfig;
 import eu.siacs.conversations.services.AvatarService;
 import eu.siacs.conversations.services.BarcodeProvider;
 import eu.siacs.conversations.services.NotificationService;
@@ -383,6 +384,11 @@ public abstract class XmppActivity extends ActionBarActivity {
     }
 
     protected void deleteAccount(final Account account, final Runnable postDelete) {
+        if (AppConfig.get(this).managesAccount(account)) {
+            Toast.makeText(this, R.string.account_managed_by_organization, Toast.LENGTH_SHORT)
+                    .show();
+            return;
+        }
         final MaterialAlertDialogBuilder builder = new MaterialAlertDialogBuilder(this);
         final View dialogView = getLayoutInflater().inflate(R.layout.dialog_delete_account, null);
         builder.setView(dialogView);

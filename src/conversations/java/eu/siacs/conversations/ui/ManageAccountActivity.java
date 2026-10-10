@@ -25,6 +25,7 @@ import eu.siacs.conversations.Config;
 import eu.siacs.conversations.R;
 import eu.siacs.conversations.databinding.ActivityManageAccountsBinding;
 import eu.siacs.conversations.entities.Account;
+import eu.siacs.conversations.services.AppConfig;
 import eu.siacs.conversations.services.XmppConnectionService;
 import eu.siacs.conversations.services.XmppConnectionService.OnAccountUpdate;
 import eu.siacs.conversations.ui.adapter.AccountAdapter;
@@ -125,6 +126,14 @@ public class ManageAccountActivity extends XmppActivity
             menu.findItem(R.id.mgmt_account_disable).setVisible(false);
             menu.findItem(R.id.mgmt_account_announce_pgp).setVisible(false);
             menu.findItem(R.id.mgmt_account_publish_avatar).setVisible(false);
+        }
+        final AppConfig appConfig = AppConfig.get(this);
+        if (appConfig.managesAccount(this.selectedAccount)) {
+            menu.findItem(R.id.mgmt_account_delete).setVisible(false);
+        }
+        if (appConfig.managesEnabled(this.selectedAccount)) {
+            menu.findItem(R.id.mgmt_account_enable).setVisible(false);
+            menu.findItem(R.id.mgmt_account_disable).setVisible(false);
         }
         menu.setHeaderTitle(this.selectedAccount.getJid().asBareJid().toString());
     }

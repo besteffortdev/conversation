@@ -1,0 +1,402 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The managed configuration (app config) an MDM can set for Conversations. The xmpp_*
+     keys set up an account; every other key is the Conversations preference it sets and
+     locks. Empty or "unset": not managed. See docs/app-config.md and AppConfig. -->
+<restrictions xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <restriction
+        android:key="xmpp_domain"
+        android:title="@string/app_config_xmpp_domain"
+        android:description="@string/app_config_xmpp_domain_desc"
+        android:restrictionType="string"
+        android:defaultValue="" />
+
+    <restriction
+        android:key="xmpp_host"
+        android:title="@string/app_config_xmpp_host"
+        android:description="@string/app_config_xmpp_host_desc"
+        android:restrictionType="string"
+        android:defaultValue="" />
+
+    <restriction
+        android:key="xmpp_port"
+        android:title="@string/app_config_xmpp_port"
+        android:description="@string/app_config_xmpp_port_desc"
+        android:restrictionType="string"
+        android:defaultValue="" />
+
+    <restriction
+        android:key="xmpp_username"
+        android:title="@string/app_config_xmpp_username"
+        android:description="@string/app_config_xmpp_username_desc"
+        android:restrictionType="string"
+        android:defaultValue="" />
+
+    <restriction
+        android:key="xmpp_password"
+        android:title="@string/app_config_xmpp_password"
+        android:description="@string/app_config_xmpp_password_desc"
+        android:restrictionType="string"
+        android:defaultValue="" />
+
+    <restriction
+        android:key="xmpp_trusted_ca_certificate"
+        android:title="@string/app_config_xmpp_trusted_ca_certificate"
+        android:description="@string/app_config_xmpp_trusted_ca_certificate_desc"
+        android:restrictionType="string"
+        android:defaultValue="" />
+
+    <restriction
+        android:key="xmpp_enabled"
+        android:title="@string/app_config_xmpp_enabled"
+        android:description="@string/app_config_xmpp_enabled_desc"
+        android:restrictionType="choice"
+        android:entries="@array/app_config_boolean_entries"
+        android:entryValues="@array/app_config_boolean_values"
+        android:defaultValue="unset" />
+
+    <restriction
+        android:key="confirm_messages"
+        android:title="@string/app_config_confirm_messages"
+        android:description="@string/app_config_confirm_messages_desc"
+        android:restrictionType="choice"
+        android:entries="@array/app_config_boolean_entries"
+        android:entryValues="@array/app_config_boolean_values"
+        android:defaultValue="unset" />
+
+    <restriction
+        android:key="chat_states"
+        android:title="@string/app_config_chat_states"
+        android:description="@string/app_config_chat_states_desc"
+        android:restrictionType="choice"
+        android:entries="@array/app_config_boolean_entries"
+        android:entryValues="@array/app_config_boolean_values"
+        android:defaultValue="unset" />
+
+    <restriction
+        android:key="last_activity"
+        android:title="@string/app_config_last_activity"
+        android:description="@string/app_config_last_activity_desc"
+        android:restrictionType="choice"
+        android:entries="@array/app_config_boolean_entries"
+        android:entryValues="@array/app_config_boolean_values"
+        android:defaultValue="unset" />
+
+    <restriction
+        android:key="entity_time"
+        android:title="@string/app_config_entity_time"
+        android:description="@string/app_config_entity_time_desc"
+        android:restrictionType="choice"
+        android:entries="@array/app_config_boolean_entries"
+        android:entryValues="@array/app_config_boolean_values"
+        android:defaultValue="unset" />
+
+    <restriction
+        android:key="allow_message_correction"
+        android:title="@string/app_config_allow_message_correction"
+        android:description="@string/app_config_allow_message_correction_desc"
+        android:restrictionType="choice"
+        android:entries="@array/app_config_boolean_entries"
+        android:entryValues="@array/app_config_boolean_values"
+        android:defaultValue="unset" />
+
+    <restriction
+        android:key="accept_invites_from_strangers"
+        android:title="@string/app_config_accept_invites_from_strangers"
+        android:description="@string/app_config_accept_invites_from_strangers_desc"
+        android:restrictionType="choice"
+        android:entries="@array/app_config_boolean_entries"
+        android:entryValues="@array/app_config_boolean_values"
+        android:defaultValue="unset" />
+
+    <restriction
+        android:key="notifications_from_strangers"
+        android:title="@string/app_config_notifications_from_strangers"
+        android:description="@string/app_config_notifications_from_strangers_desc"
+        android:restrictionType="choice"
+        android:entries="@array/app_config_boolean_entries"
+        android:entryValues="@array/app_config_boolean_values"
+        android:defaultValue="unset" />
+
+    <restriction
+        android:key="use_relays"
+        android:title="@string/app_config_use_relays"
+        android:description="@string/app_config_use_relays_desc"
+        android:restrictionType="choice"
+        android:entries="@array/app_config_boolean_entries"
+        android:entryValues="@array/app_config_boolean_values"
+        android:defaultValue="unset" />
+
+    <restriction
+        android:key="send_crash_reports"
+        android:title="@string/app_config_send_crash_reports"
+        android:description="@string/app_config_send_crash_reports_desc"
+        android:restrictionType="choice"
+        android:entries="@array/app_config_boolean_entries"
+        android:entryValues="@array/app_config_boolean_values"
+        android:defaultValue="unset" />
+
+    <restriction
+        android:key="omemo"
+        android:title="@string/app_config_omemo"
+        android:description="@string/app_config_omemo_desc"
+        android:restrictionType="choice"
+        android:entries="@array/app_config_omemo_entries"
+        android:entryValues="@array/app_config_omemo_values"
+        android:defaultValue="unset" />
+
+    <restriction
+        android:key="btbv"
+        android:title="@string/app_config_btbv"
+        android:description="@string/app_config_btbv_desc"
+        android:restrictionType="choice"
+        android:entries="@array/app_config_boolean_entries"
+        android:entryValues="@array/app_config_boolean_values"
+        android:defaultValue="unset" />
+
+    <restriction
+        android:key="trust_system_ca_store"
+        android:title="@string/app_config_trust_system_ca_store"
+        android:description="@string/app_config_trust_system_ca_store_desc"
+        android:restrictionType="choice"
+        android:entries="@array/app_config_boolean_entries"
+        android:entryValues="@array/app_config_boolean_values"
+        android:defaultValue="unset" />
+
+    <restriction
+        android:key="require_tls_v1_3"
+        android:title="@string/app_config_require_tls_v1_3"
+        android:description="@string/app_config_require_tls_v1_3_desc"
+        android:restrictionType="choice"
+        android:entries="@array/app_config_boolean_entries"
+        android:entryValues="@array/app_config_boolean_values"
+        android:defaultValue="unset" />
+
+    <restriction
+        android:key="channel_binding_required"
+        android:title="@string/app_config_channel_binding_required"
+        android:description="@string/app_config_channel_binding_required_desc"
+        android:restrictionType="choice"
+        android:entries="@array/app_config_boolean_entries"
+        android:entryValues="@array/app_config_boolean_values"
+        android:defaultValue="unset" />
+
+    <restriction
+        android:key="automatic_message_deletion"
+        android:title="@string/app_config_automatic_message_deletion"
+        android:description="@string/app_config_automatic_message_deletion_desc"
+        android:restrictionType="string"
+        android:defaultValue="" />
+
+    <restriction
+        android:key="use_tor"
+        android:title="@string/app_config_use_tor"
+        android:description="@string/app_config_use_tor_desc"
+        android:restrictionType="choice"
+        android:entries="@array/app_config_boolean_entries"
+        android:entryValues="@array/app_config_boolean_values"
+        android:defaultValue="unset" />
+
+    <restriction
+        android:key="show_connection_options"
+        android:title="@string/app_config_show_connection_options"
+        android:description="@string/app_config_show_connection_options_desc"
+        android:restrictionType="choice"
+        android:entries="@array/app_config_boolean_entries"
+        android:entryValues="@array/app_config_boolean_values"
+        android:defaultValue="unset" />
+
+    <restriction
+        android:key="channel_discovery_method"
+        android:title="@string/app_config_channel_discovery_method"
+        android:description="@string/app_config_channel_discovery_method_desc"
+        android:restrictionType="choice"
+        android:entries="@array/app_config_channel_discovery_entries"
+        android:entryValues="@array/app_config_channel_discovery_values"
+        android:defaultValue="unset" />
+
+    <restriction
+        android:key="manually_change_presence"
+        android:title="@string/app_config_manually_change_presence"
+        android:description="@string/app_config_manually_change_presence_desc"
+        android:restrictionType="choice"
+        android:entries="@array/app_config_boolean_entries"
+        android:entryValues="@array/app_config_boolean_values"
+        android:defaultValue="unset" />
+
+    <restriction
+        android:key="away_when_screen_off"
+        android:title="@string/app_config_away_when_screen_off"
+        android:description="@string/app_config_away_when_screen_off_desc"
+        android:restrictionType="choice"
+        android:entries="@array/app_config_boolean_entries"
+        android:entryValues="@array/app_config_boolean_values"
+        android:defaultValue="unset" />
+
+    <restriction
+        android:key="dnd_on_silent_mode"
+        android:title="@string/app_config_dnd_on_silent_mode"
+        android:description="@string/app_config_dnd_on_silent_mode_desc"
+        android:restrictionType="choice"
+        android:entries="@array/app_config_boolean_entries"
+        android:entryValues="@array/app_config_boolean_values"
+        android:defaultValue="unset" />
+
+    <restriction
+        android:key="treat_vibrate_as_silent"
+        android:title="@string/app_config_treat_vibrate_as_silent"
+        android:description="@string/app_config_treat_vibrate_as_silent_desc"
+        android:restrictionType="choice"
+        android:entries="@array/app_config_boolean_entries"
+        android:entryValues="@array/app_config_boolean_values"
+        android:defaultValue="unset" />
+
+    <restriction
+        android:key="grace_period_length"
+        android:title="@string/app_config_grace_period_length"
+        android:description="@string/app_config_grace_period_length_desc"
+        android:restrictionType="string"
+        android:defaultValue="" />
+
+    <restriction
+        android:key="enable_foreground_service"
+        android:title="@string/app_config_enable_foreground_service"
+        android:description="@string/app_config_enable_foreground_service_desc"
+        android:restrictionType="choice"
+        android:entries="@array/app_config_boolean_entries"
+        android:entryValues="@array/app_config_boolean_values"
+        android:defaultValue="unset" />
+
+    <restriction
+        android:key="allow_screenshots"
+        android:title="@string/app_config_allow_screenshots"
+        android:description="@string/app_config_allow_screenshots_desc"
+        android:restrictionType="choice"
+        android:entries="@array/app_config_boolean_entries"
+        android:entryValues="@array/app_config_boolean_values"
+        android:defaultValue="unset" />
+
+    <restriction
+        android:key="show_dynamic_tags"
+        android:title="@string/app_config_show_dynamic_tags"
+        android:description="@string/app_config_show_dynamic_tags_desc"
+        android:restrictionType="choice"
+        android:entries="@array/app_config_boolean_entries"
+        android:entryValues="@array/app_config_boolean_values"
+        android:defaultValue="unset" />
+
+    <restriction
+        android:key="scroll_to_bottom"
+        android:title="@string/app_config_scroll_to_bottom"
+        android:description="@string/app_config_scroll_to_bottom_desc"
+        android:restrictionType="choice"
+        android:entries="@array/app_config_boolean_entries"
+        android:entryValues="@array/app_config_boolean_values"
+        android:defaultValue="unset" />
+
+    <restriction
+        android:key="start_searching"
+        android:title="@string/app_config_start_searching"
+        android:description="@string/app_config_start_searching_desc"
+        android:restrictionType="choice"
+        android:entries="@array/app_config_boolean_entries"
+        android:entryValues="@array/app_config_boolean_values"
+        android:defaultValue="unset" />
+
+    <restriction
+        android:key="display_enter_key"
+        android:title="@string/app_config_display_enter_key"
+        android:description="@string/app_config_display_enter_key_desc"
+        android:restrictionType="choice"
+        android:entries="@array/app_config_boolean_entries"
+        android:entryValues="@array/app_config_boolean_values"
+        android:defaultValue="unset" />
+
+    <restriction
+        android:key="enter_is_send"
+        android:title="@string/app_config_enter_is_send"
+        android:description="@string/app_config_enter_is_send_desc"
+        android:restrictionType="choice"
+        android:entries="@array/app_config_boolean_entries"
+        android:entryValues="@array/app_config_boolean_values"
+        android:defaultValue="unset" />
+
+    <restriction
+        android:key="use_green_background"
+        android:title="@string/app_config_use_green_background"
+        android:description="@string/app_config_use_green_background_desc"
+        android:restrictionType="choice"
+        android:entries="@array/app_config_boolean_entries"
+        android:entryValues="@array/app_config_boolean_values"
+        android:defaultValue="unset" />
+
+    <restriction
+        android:key="large_font"
+        android:title="@string/app_config_large_font"
+        android:description="@string/app_config_large_font_desc"
+        android:restrictionType="choice"
+        android:entries="@array/app_config_boolean_entries"
+        android:entryValues="@array/app_config_boolean_values"
+        android:defaultValue="unset" />
+
+    <restriction
+        android:key="align_start"
+        android:title="@string/app_config_align_start"
+        android:description="@string/app_config_align_start_desc"
+        android:restrictionType="choice"
+        android:entries="@array/app_config_boolean_entries"
+        android:entryValues="@array/app_config_boolean_values"
+        android:defaultValue="unset" />
+
+    <restriction
+        android:key="show_avatars"
+        android:title="@string/app_config_show_avatars"
+        android:description="@string/app_config_show_avatars_desc"
+        android:restrictionType="choice"
+        android:entries="@array/app_config_boolean_entries"
+        android:entryValues="@array/app_config_boolean_values"
+        android:defaultValue="unset" />
+
+    <restriction
+        android:key="show_avatars_accounts"
+        android:title="@string/app_config_show_avatars_accounts"
+        android:description="@string/app_config_show_avatars_accounts_desc"
+        android:restrictionType="choice"
+        android:entries="@array/app_config_boolean_entries"
+        android:entryValues="@array/app_config_boolean_values"
+        android:defaultValue="unset" />
+
+    <restriction
+        android:key="auto_send_recording"
+        android:title="@string/app_config_auto_send_recording"
+        android:description="@string/app_config_auto_send_recording_desc"
+        android:restrictionType="choice"
+        android:entries="@array/app_config_boolean_entries"
+        android:entryValues="@array/app_config_boolean_values"
+        android:defaultValue="unset" />
+
+    <restriction
+        android:key="picture_compression"
+        android:title="@string/app_config_picture_compression"
+        android:description="@string/app_config_picture_compression_desc"
+        android:restrictionType="choice"
+        android:entries="@array/app_config_picture_compression_entries"
+        android:entryValues="@array/app_config_picture_compression_values"
+        android:defaultValue="unset" />
+
+    <restriction
+        android:key="video_compression"
+        android:title="@string/app_config_video_compression"
+        android:description="@string/app_config_video_compression_desc"
+        android:restrictionType="choice"
+        android:entries="@array/app_config_video_compression_entries"
+        android:entryValues="@array/app_config_video_compression_values"
+        android:defaultValue="unset" />
+
+    <restriction
+        android:key="auto_accept_file_size"
+        android:title="@string/app_config_auto_accept_file_size"
+        android:description="@string/app_config_auto_accept_file_size_desc"
+        android:restrictionType="string"
+        android:defaultValue="" />
+</restrictions>

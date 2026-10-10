@@ -230,6 +230,7 @@ public class XmppConnectionService extends Service {
     private final ChannelDiscoveryService mChannelDiscoveryService =
             new ChannelDiscoveryService(this);
     private final ShortcutService mShortcutService = new ShortcutService(this);
+    private final AppConfigService appConfigService = new AppConfigService(this);
     private final AtomicBoolean mInitialAddressbookSyncCompleted = new AtomicBoolean(false);
     private final AtomicBoolean mOngoingVideoTranscoding = new AtomicBoolean(false);
     private final AtomicBoolean mForceDuringOnCreate = new AtomicBoolean(false);
@@ -1096,6 +1097,7 @@ public class XmppConnectionService extends Service {
         }
 
         restoreFromDatabase();
+        appConfigService.start();
 
         if (QuickConversationsService.isContactListIntegration(this)
                 && ContextCompat.checkSelfPermission(this, Manifest.permission.READ_CONTACTS)
@@ -1261,6 +1263,7 @@ public class XmppConnectionService extends Service {
         } catch (final RuntimeException e) {
             // ignored
         }
+        appConfigService.stop();
         destroyed = false;
         fileObserver.stopWatching();
         internalPingExecutor.shutdown();
@@ -2351,6 +2354,7 @@ public class XmppConnectionService extends Service {
     }
 
     public void createAccount(final Account account) {
+        appConfigService.enforce(account);
         account.setXmppConnection(new XmppConnection(account, this));
         databaseBackend.createAccount(account);
         if (CallIntegration.hasSystemFeature(this)) {
@@ -2474,6 +2478,7 @@ public class XmppConnectionService extends Service {
     }
 
     public boolean updateAccount(final Account account) {
+        appConfigService.enforce(account);
         if (databaseBackend.updateAccount(account)) {
             account.setShowErrorNotification(true);
             // TODO what was the purpose of that? will likely be triggered by reconnect anyway?

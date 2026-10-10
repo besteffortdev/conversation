@@ -10,6 +10,7 @@ import com.google.android.material.color.MaterialColors;
 import eu.siacs.conversations.R;
 import eu.siacs.conversations.databinding.ItemAccountBinding;
 import eu.siacs.conversations.entities.Account;
+import eu.siacs.conversations.services.AppConfig;
 import eu.siacs.conversations.ui.XmppActivity;
 import eu.siacs.conversations.ui.util.AvatarWorkerTask;
 import java.util.List;
@@ -92,6 +93,8 @@ public class AccountAdapter extends ArrayAdapter<Account> {
         final boolean isDisabled = (account.getStatus() == Account.State.DISABLED);
         viewHolder.binding.tglAccountStatus.setOnCheckedChangeListener(null);
         viewHolder.binding.tglAccountStatus.setChecked(!isDisabled);
+        viewHolder.binding.tglAccountStatus.setEnabled(
+                !AppConfig.get(activity).managesEnabled(account));
         if (this.showStateButton) {
             viewHolder.binding.tglAccountStatus.setVisibility(View.VISIBLE);
         } else {
