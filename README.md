@@ -1,3 +1,33 @@
+## About this fork
+
+This is a personal fork of [Conversations](https://codeberg.org/iNPUTmice/Conversations), based
+on version 2.20.4. It differs from upstream as follows:
+
+* **Long-press message overlay.** Long-pressing a message moves it to the middle of the screen,
+  with a row of quick reactions above it and the message options below it, as in Signal. The
+  add-reaction button at the end of the row opens the full emoji picker. Tapping one of your own
+  reactions removes it. "Add reaction…" is no longer in the options.
+* **Short names for people on other servers.** A sender whose address is on a different server
+  than your account shows as the username only: `alice@other.example` shows as `alice`. Tapping
+  the message shows the full address.
+* **Delete for everyone ([XEP-0424](https://xmpp.org/extensions/xep-0424.html) Message
+  Retraction).** Your sent messages, including edited ones, can be deleted for everyone in the
+  chat. A deleted message, yours or anyone else's, shows as "This message was deleted". Clients
+  without support get a fallback text. A deletion that arrives before its message, for example
+  while history loads from the newest message back, is remembered and applied once the message
+  arrives.
+* **Group chat history matches the room's message IDs.** Group chat messages loaded from the
+  server archive (MAM) are identified by the room's `<stanza-id>` rather than the archive's own
+  result ID. Some servers, such as Openfire with the Monitoring plugin, use an internal database
+  number for the latter, so later deletions, reactions and moderation couldn't find those
+  messages.
+* **Managed configuration (MDM app config).** An MDM such as SOTI MobiControl or Intune can set
+  up the XMPP account (domain, host, port, username, password, CA certificate, on/off) and set
+  39 Conversations settings, which users then can't change. See
+  [docs/app-config.md](docs/app-config.md).
+
+---
+
 <h1 align="center">Conversations</h1>
 
 <p align="center">Conversations: the very last word in instant messaging</p>
