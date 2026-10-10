@@ -13,6 +13,7 @@ import com.google.common.base.Strings;
 import eu.siacs.conversations.AppSettings;
 import eu.siacs.conversations.R;
 import eu.siacs.conversations.crypto.OmemoSetting;
+import eu.siacs.conversations.services.AppConfigService;
 import eu.siacs.conversations.services.MemorizingTrustManager;
 import eu.siacs.conversations.services.QuickConversationsService;
 import java.security.KeyStoreException;
@@ -82,6 +83,8 @@ public class SecuritySettingsFragment extends XmppPreferenceFragment {
     private void showRemoveCertificatesDialog() {
         final MemorizingTrustManager mtm = requireService().getMemorizingTrustManager();
         final ArrayList<String> aliases = Collections.list(mtm.getCertificates());
+        // the MDM's CA certificates come back at the next read
+        aliases.removeIf(alias -> alias.startsWith(AppConfigService.CERTIFICATE_ALIAS_PREFIX));
         if (aliases.isEmpty()) {
             Toast.makeText(requireActivity(), R.string.toast_no_trusted_certs, Toast.LENGTH_LONG)
                     .show();

@@ -63,6 +63,7 @@ import eu.siacs.conversations.databinding.ActivityEditAccountBinding;
 import eu.siacs.conversations.databinding.DialogPresenceBinding;
 import eu.siacs.conversations.entities.Account;
 import eu.siacs.conversations.entities.PresenceTemplate;
+import eu.siacs.conversations.services.AppConfig;
 import eu.siacs.conversations.services.BarcodeProvider;
 import eu.siacs.conversations.services.PushManagementService;
 import eu.siacs.conversations.services.QuickConversationsService;
@@ -665,6 +666,9 @@ public class EditAccountActivity extends OmemoActivity
         } else {
             this.binding.portLayout.setEnabled(true);
         }
+        if (AppConfig.get(this).managesServerOf(mAccount)) {
+            this.binding.portLayout.setEnabled(false);
+        }
     }
 
     protected void updateSaveButton() {
@@ -865,6 +869,13 @@ public class EditAccountActivity extends OmemoActivity
             mamPrefs.setVisible(false);
             changePresence.setVisible(false);
         }
+        final AppConfig appConfig = AppConfig.get(this);
+        if (appConfig.managesPassword(mAccount)) {
+            changePassword.setVisible(false);
+        }
+        if (appConfig.managesAccount(mAccount)) {
+            deleteAccount.setVisible(false);
+        }
         return super.onCreateOptionsMenu(menu);
     }
 
@@ -1044,6 +1055,7 @@ public class EditAccountActivity extends OmemoActivity
             processFingerprintVerification(pendingUri, false);
             pendingUri = null;
         }
+        suggestManagedAccount();
         updatePortLayout();
         updateSaveButton();
         invalidateOptionsMenu();
@@ -1608,6 +1620,50 @@ public class EditAccountActivity extends OmemoActivity
                 this.binding.serviceOutage.setVisibility(View.GONE);
             }
         }
+        lockManagedFields();
+    }
+
+    /** A new account starts with the address the MDM sets without a password to add it with. */
+    private void suggestManagedAccount() {
+        final Jid jid = AppConfig.get(this).getJid();
+        if (mAccount != null
+                || !mInitMode
+                || jid == null
+                || xmppConnectionService.findAccountByJid(jid) != null
+                || this.binding.accountJid.getText().length() > 0) {
+            return;
+        }
+        this.binding.accountJid.setText(jid.toString(), false);
+        this.binding.accountPassword.requestFocus();
+    }
+
+    /** Fields the MDM sets (see {@link AppConfig}) are shown, not editable. */
+    private void lockManagedFields() {
+        final AppConfig appConfig = AppConfig.get(this);
+        boolean managed = false;
+        if (appConfig.managesAccount(mAccount)) {
+            lock(this.binding.accountJid);
+            managed = true;
+        }
+        if (appConfig.managesPassword(mAccount)) {
+            lock(this.binding.accountPassword);
+            this.binding.accountPasswordLayout.setPasswordVisibilityToggleEnabled(false);
+        }
+        if (appConfig.managesServerOf(mAccount)) {
+            lock(this.binding.hostname);
+            lock(this.binding.port);
+            this.binding.portLayout.setEnabled(false);
+            managed = true;
+        }
+        this.binding.accountJidLayout.setHelperText(
+                managed ? getString(R.string.managed_by_organization) : null);
+    }
+
+    private static void lock(final EditText editText) {
+        editText.setEnabled(false);
+        editText.setFocusable(false);
+        editText.setFocusableInTouchMode(false);
+        editText.setCursorVisible(false);
     }
 
     private void updateDisplayName(String displayName) {

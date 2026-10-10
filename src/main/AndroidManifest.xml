@@ -110,6 +110,11 @@
             android:name="com.google.android.gms.car.application"
             android:resource="@xml/automotive_app_desc" />
 
+        <!-- the managed configuration (app config) an MDM can set: see docs/app-config.md -->
+        <meta-data
+            android:name="android.content.APP_RESTRICTIONS"
+            android:resource="@xml/app_restrictions" />
+
         <!-- The warning that systemExempted requires alarm permission is incorrect because doze white list is sufficient -->
         <service
             android:name=".services.XmppConnectionService"

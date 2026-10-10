@@ -1,0 +1,162 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- What MDM consoles show for xml/app_restrictions.xml. Added by this fork; kept separate from
+     strings.xml to avoid conflicts with upstream -->
+<resources>
+    <string name="app_config_xmpp_domain">XMPP domain</string>
+    <string name="app_config_xmpp_domain_desc">The server part of XMPP addresses: username@domain. Setting it also manages the server host and port of the accounts on this domain (left empty: their defaults).</string>
+    <string name="app_config_xmpp_host">Server host</string>
+    <string name="app_config_xmpp_host_desc">Connect to this host instead of looking the domain up in DNS. Leave empty normally. Setting it turns on Extended connection settings.</string>
+    <string name="app_config_xmpp_port">Server port</string>
+    <string name="app_config_xmpp_port_desc">The port on the server host. Default: 5222.</string>
+    <string name="app_config_xmpp_username">XMPP username</string>
+    <string name="app_config_xmpp_username_desc">The username or the full XMPP address; the MDM\'s user variables can fill it in. With a password, Conversations adds this account by itself, and users can\'t delete it. Without one, the address is filled in on the sign-in screen.</string>
+    <string name="app_config_xmpp_password">XMPP password</string>
+    <string name="app_config_xmpp_password_desc">With the username: the account\'s password, which users can\'t change. Leave empty for users to type their own.</string>
+    <string name="app_config_xmpp_trusted_ca_certificate">XMPP server CA certificate</string>
+    <string name="app_config_xmpp_trusted_ca_certificate_desc">A CA certificate to trust for the XMPP server: PEM text (several certificates may follow each other) or Base64 DER.</string>
+    <string name="app_config_xmpp_enabled">Account enabled</string>
+    <string name="app_config_xmpp_enabled_desc">Whether the account set above, and those on the XMPP domain, connect. Not managed: users decide.</string>
+
+    <string name="app_config_confirm_messages">Read receipts</string>
+    <string name="app_config_confirm_messages_desc">Contacts see when messages were read. Default: on.</string>
+    <string name="app_config_chat_states">Typing notifications</string>
+    <string name="app_config_chat_states_desc">Contacts see when the user is writing to them. Default: on.</string>
+    <string name="app_config_last_activity">Show last seen</string>
+    <string name="app_config_last_activity_desc">Contacts see when the user was last active. Default: off.</string>
+    <string name="app_config_entity_time">Share local time</string>
+    <string name="app_config_entity_time_desc">Contacts see the device\'s local time. Default: on.</string>
+    <string name="app_config_allow_message_correction">Message edits</string>
+    <string name="app_config_allow_message_correction_desc">Contacts may edit the messages they sent. Default: on.</string>
+    <string name="app_config_accept_invites_from_strangers">Invites from strangers</string>
+    <string name="app_config_accept_invites_from_strangers_desc">Accept group chat invites from people outside the contact list. Default: on.</string>
+    <string name="app_config_notifications_from_strangers">Notifications from strangers</string>
+    <string name="app_config_notifications_from_strangers_desc">Notify for messages from people outside the contact list. Default: on.</string>
+    <string name="app_config_use_relays">Always use relays</string>
+    <string name="app_config_use_relays_desc">Send file transfers through the server, which hides the device\'s IP address. Default: off.</string>
+    <string name="app_config_send_crash_reports">Send crash reports</string>
+    <string name="app_config_send_crash_reports_desc">Offer to send crash reports to the developers. Default: on.</string>
+    <string name="app_config_omemo">OMEMO encryption</string>
+    <string name="app_config_omemo_desc">End-to-end encryption of new chats. Default: on by default.</string>
+    <string name="app_config_btbv">Blind trust before verification</string>
+    <string name="app_config_btbv_desc">OMEMO: trust new devices of contacts nobody verified. Default: on.</string>
+    <string name="app_config_trust_system_ca_store">Trust system CAs</string>
+    <string name="app_config_trust_system_ca_store_desc">Trust the certificate authorities installed on the device, the public ones and those the MDM installs. Default: on.</string>
+    <string name="app_config_require_tls_v1_3">Require TLS 1.3</string>
+    <string name="app_config_require_tls_v1_3_desc">Connect with TLS 1.3 only. Default: on.</string>
+    <string name="app_config_channel_binding_required">Require channel binding</string>
+    <string name="app_config_channel_binding_required_desc">Refuse logins without channel binding, which detects some machine-in-the-middle attacks. Default: off.</string>
+    <string name="app_config_automatic_message_deletion">Automatic message deletion</string>
+    <string name="app_config_automatic_message_deletion_desc">Seconds after which messages are deleted from the device; 0: never. Default: 0.</string>
+    <string name="app_config_use_tor">Connect via Tor</string>
+    <string name="app_config_use_tor_desc">Tunnel the connection through Tor; needs Orbot. Default: off.</string>
+    <string name="app_config_show_connection_options">Extended connection settings</string>
+    <string name="app_config_show_connection_options_desc">Users can set the server host and port of their accounts. Default: off; on whenever a server host is set above.</string>
+    <string name="app_config_channel_discovery_method">Discover channels on</string>
+    <string name="app_config_channel_discovery_method_desc">Where Discover channels looks for group chats. Default: the public directory.</string>
+    <string name="app_config_manually_change_presence">Manage availability manually</string>
+    <string name="app_config_manually_change_presence_desc">Set the availability when editing the status message. Default: off.</string>
+    <string name="app_config_away_when_screen_off">Away when the device is locked</string>
+    <string name="app_config_away_when_screen_off_desc">Default: off.</string>
+    <string name="app_config_dnd_on_silent_mode">Sync Do Not Disturb</string>
+    <string name="app_config_dnd_on_silent_mode_desc">Show as Do Not Disturb while Android\'s Do Not Disturb is on. Default: off.</string>
+    <string name="app_config_treat_vibrate_as_silent">Include silent modes</string>
+    <string name="app_config_treat_vibrate_as_silent_desc">Also show as Do Not Disturb when the phone is muted or on vibrate. Default: off.</string>
+    <string name="app_config_grace_period_length">Grace period</string>
+    <string name="app_config_grace_period_length_desc">Seconds notifications stay quiet after using another device. Default: 0.</string>
+    <string name="app_config_enable_foreground_service">Keep the service in the foreground</string>
+    <string name="app_config_enable_foreground_service_desc">A permanent notification keeps the connection up in the background. Default: on.</string>
+    <string name="app_config_allow_screenshots">Allow screenshots</string>
+    <string name="app_config_allow_screenshots_desc">Off: screenshots and screen recordings show nothing, and the app is hidden in the recent apps. Default: on.</string>
+    <string name="app_config_show_dynamic_tags">Dynamic tags</string>
+    <string name="app_config_show_dynamic_tags_desc">Read-only tags under contacts. Default: off.</string>
+    <string name="app_config_scroll_to_bottom">Scroll to bottom</string>
+    <string name="app_config_scroll_to_bottom_desc">Scroll down after sending a message. Default: on.</string>
+    <string name="app_config_start_searching">Direct search</string>
+    <string name="app_config_start_searching_desc">The New chat screen opens with the keyboard in the search field. Default: off.</string>
+    <string name="app_config_display_enter_key">Show enter key</string>
+    <string name="app_config_display_enter_key_desc">An enter key instead of the emoticons key. Default: off.</string>
+    <string name="app_config_enter_is_send">Enter is send</string>
+    <string name="app_config_enter_is_send_desc">The Enter key sends the message. Default: off.</string>
+    <string name="app_config_use_green_background">Colorful chat bubbles</string>
+    <string name="app_config_use_green_background_desc">Different colors for sent and received messages. Default: on.</string>
+    <string name="app_config_large_font">Large font</string>
+    <string name="app_config_large_font_desc">Larger text in message bubbles. Default: off.</string>
+    <string name="app_config_align_start">Left-aligned messages</string>
+    <string name="app_config_align_start_desc">Sent messages on the left too. Default: off.</string>
+    <string name="app_config_show_avatars">Avatars in 1:1 chats</string>
+    <string name="app_config_show_avatars_desc">Default: on.</string>
+    <string name="app_config_show_avatars_accounts">Account avatars</string>
+    <string name="app_config_show_avatars_accounts_desc">The account avatar on sent messages. Default: on.</string>
+    <string name="app_config_auto_send_recording">Auto-send recordings</string>
+    <string name="app_config_auto_send_recording_desc">Send voice messages when the recording ends. Default: on.</string>
+    <string name="app_config_picture_compression">Image compression</string>
+    <string name="app_config_picture_compression_desc">Default: automatic.</string>
+    <string name="app_config_video_compression">Video quality</string>
+    <string name="app_config_video_compression_desc">Default: 480p.</string>
+    <string name="app_config_auto_accept_file_size">Automatic download</string>
+    <string name="app_config_auto_accept_file_size_desc">Files up to this size in bytes download without asking; 0: never. Default: 524288.</string>
+
+    <!-- The choices' labels are text, not @string references: an MDM console reads them from
+         the APK, and SOTI MobiControl showed other strings of the APK for references.
+         "unset" is AppConfig.UNSET. -->
+    <string-array name="app_config_boolean_entries" translatable="false">
+        <item>Not managed</item>
+        <item>On</item>
+        <item>Off</item>
+    </string-array>
+    <string-array name="app_config_boolean_values" translatable="false">
+        <item>unset</item>
+        <item>true</item>
+        <item>false</item>
+    </string-array>
+    <string-array name="app_config_omemo_entries" translatable="false">
+        <item>Not managed</item>
+        <item>Always</item>
+        <item>On by default</item>
+        <item>Off by default</item>
+    </string-array>
+    <string-array name="app_config_omemo_values" translatable="false">
+        <item>unset</item>
+        <item>always</item>
+        <item>default_on</item>
+        <item>default_off</item>
+    </string-array>
+    <string-array name="app_config_picture_compression_entries" translatable="false">
+        <item>Not managed</item>
+        <item>Never</item>
+        <item>Automatic</item>
+        <item>Always</item>
+    </string-array>
+    <string-array name="app_config_picture_compression_values" translatable="false">
+        <item>unset</item>
+        <item>never</item>
+        <item>auto</item>
+        <item>always</item>
+    </string-array>
+    <string-array name="app_config_video_compression_entries" translatable="false">
+        <item>Not managed</item>
+        <item>360p</item>
+        <item>480p</item>
+        <item>720p</item>
+        <item>1080p</item>
+        <item>Uncompressed</item>
+    </string-array>
+    <string-array name="app_config_video_compression_values" translatable="false">
+        <item>unset</item>
+        <item>360</item>
+        <item>480</item>
+        <item>720</item>
+        <item>1080</item>
+        <item>uncompressed</item>
+    </string-array>
+    <string-array name="app_config_channel_discovery_entries" translatable="false">
+        <item>Not managed</item>
+        <item>Public directory (search.jabber.network)</item>
+        <item>Your XMPP server</item>
+    </string-array>
+    <string-array name="app_config_channel_discovery_values" translatable="false">
+        <item>unset</item>
+        <item>JABBER_NETWORK</item>
+        <item>LOCAL_SERVER</item>
+    </string-array>
+</resources>

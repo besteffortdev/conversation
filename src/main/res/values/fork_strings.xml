@@ -7,4 +7,6 @@
     <string name="could_not_retract_message">Could not delete message</string>
     <string name="message_retracted">This message was deleted</string>
     <string name="message_retracted_by_you">You deleted this message</string>
+    <string name="managed_by_organization">Managed by your organization</string>
+    <string name="account_managed_by_organization">This account is managed by your organization</string>
 </resources>
