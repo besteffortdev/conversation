@@ -23,7 +23,8 @@ on version 2.20.4. It differs from upstream as follows:
   messages.
 * **Managed configuration (MDM app config).** An MDM such as SOTI MobiControl or Intune can set
   up the XMPP account (domain, host, port, username, password, CA certificate, on/off) and set
-  39 Conversations settings, which users then can't change. See
+  39 Conversations settings, which users then can't change. With a domain set, the app opens
+  straight on the sign-in screen, where users type only their username and password. See
   [docs/app-config.md](docs/app-config.md).
 * **User search when adding a contact, inviting people or creating a private group
   ([XEP-0055](https://xmpp.org/extensions/xep-0055.html) Jabber Search).** If your server has a

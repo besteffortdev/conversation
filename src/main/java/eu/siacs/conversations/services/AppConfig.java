@@ -463,6 +463,15 @@ public final class AppConfig {
         return settings.containsKey(key);
     }
 
+    /**
+     * The server the MDM sets: given as such or as the managed account's; null if none is. New
+     * accounts are signed in on it with only a username.
+     */
+    @Nullable
+    public Jid getDomain() {
+        return domain;
+    }
+
     /** The account the MDM sets up; null if it doesn't. */
     @Nullable
     public Jid getJid() {

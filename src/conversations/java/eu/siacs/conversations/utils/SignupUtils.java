@@ -8,6 +8,7 @@ import eu.siacs.conversations.Config;
 import eu.siacs.conversations.Conversations;
 import eu.siacs.conversations.entities.Account;
 import eu.siacs.conversations.persistance.DatabaseBackend;
+import eu.siacs.conversations.services.AppConfig;
 import eu.siacs.conversations.ui.ConversationsActivity;
 import eu.siacs.conversations.ui.EditAccountActivity;
 import eu.siacs.conversations.ui.MagicCreateActivity;
@@ -44,6 +45,11 @@ public class SignupUtils {
         final Intent intent;
         if (toServerChooser) {
             intent = new Intent(context, PickServerActivity.class);
+        } else if (AppConfig.get(context).getDomain() != null) {
+            // the MDM sets the server: straight to signing in there with a username
+            intent = new Intent(context, EditAccountActivity.class);
+            intent.putExtra(EditAccountActivity.EXTRA_FORCE_REGISTER, false);
+            intent.putExtra("init", true);
         } else {
             intent = new Intent(context, WelcomeActivity.class);
         }
@@ -69,7 +75,7 @@ public class SignupUtils {
             if (Config.X509_VERIFICATION) {
                 intent = new Intent(context, ManageAccountActivity.class);
             } else if (Config.MAGIC_CREATE_DOMAIN != null) {
-                intent = new Intent(context, WelcomeActivity.class);
+                intent = getSignUpIntent(context);
             } else {
                 intent = new Intent(context, EditAccountActivity.class);
             }
