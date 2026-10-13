@@ -246,9 +246,16 @@ public class UserSearchDialog extends DialogFragment {
                     return WindowInsetsCompat.CONSUMED;
                 });
         binding.toolbar.setNavigationOnClickListener(v -> dismiss());
+        // the search field sits in the toolbar in place of a title, so the title is its hint
+        if (isInvite()) {
+            binding.search.setHint(R.string.invite_contact);
+        } else if (isCreateGroup()) {
+            binding.search.setHint(R.string.choose_participants);
+        } else {
+            binding.search.setHint(R.string.add_contact);
+        }
+        binding.clearSearch.setOnClickListener(v -> binding.search.setText(null));
         if (isPicker()) {
-            binding.toolbar.setTitle(
-                    isInvite() ? R.string.invite_contact : R.string.choose_participants);
             binding.toolbar.inflateMenu(R.menu.user_search_picker);
             binding.toolbar
                     .getMenu()
@@ -349,6 +356,9 @@ public class UserSearchDialog extends DialogFragment {
     private void onSearchTermChanged() {
         handler.removeCallbacks(searchRunnable);
         generation++;
+        final var text = binding.search.getText();
+        binding.clearSearch.setVisibility(
+                text == null || text.length() == 0 ? View.GONE : View.VISIBLE);
         if (getSearchTerm().isEmpty()) {
             adapter.setEntries(ImmutableList.of(), false);
             binding.progress.setVisibility(View.INVISIBLE);
@@ -503,14 +513,10 @@ public class UserSearchDialog extends DialogFragment {
         if (add != null) {
             add.setEnabled(!selected.isEmpty());
         }
-        binding.toolbar.setSubtitle(
-                selected.isEmpty()
-                        ? null
-                        : getResources()
-                                .getQuantityString(
-                                        R.plurals.users_selected,
-                                        selected.size(),
-                                        selected.size()));
+        binding.selectedCount.setText(
+                getResources()
+                        .getQuantityString(
+                                R.plurals.users_selected, selected.size(), selected.size()));
         final var inflater = LayoutInflater.from(binding.selected.getContext());
         binding.selected.removeAllViews();
         for (final var result : selected.values()) {
@@ -522,7 +528,7 @@ public class UserSearchDialog extends DialogFragment {
             chip.setOnCloseIconClickListener(v -> toggle(result));
             binding.selected.addView(chip);
         }
-        binding.selectedScroll.setVisibility(selected.isEmpty() ? View.GONE : View.VISIBLE);
+        binding.selectedRow.setVisibility(selected.isEmpty() ? View.GONE : View.VISIBLE);
         // keep the latest pick in view; fullScroll() would take the focus off the search field
         binding.selectedScroll.post(
                 () -> {

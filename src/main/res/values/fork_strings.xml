@@ -9,13 +9,13 @@
     <string name="message_retracted_by_you">You deleted this message</string>
     <string name="managed_by_organization">Managed by your organization</string>
     <string name="account_managed_by_organization">This account is managed by your organization</string>
-    <string name="search_users">Search users</string>
     <string name="manual_xmpp_address">Manual XMPP address</string>
     <string name="no_users_found">No users found</string>
     <string name="user_search_failed">Search failed</string>
     <string name="user_search_via_account">via %s</string>
     <string name="already_in_this_chat">Already in this chat</string>
     <string name="deselect">Deselect</string>
+    <string name="clear_search">Clear search</string>
     <plurals name="users_selected">
         <item quantity="one">%d selected</item>
         <item quantity="other">%d selected</item>
