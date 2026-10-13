@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- styles added by this fork; kept separate from themes.xml to avoid conflicts with upstream -->
+<resources>
+
+    <!-- applied on top of the activity's theme, so colors (dark mode, dynamic colors) carry over -->
+    <style name="ThemeOverlay.Conversations3.FullScreenDialog" parent="">
+        <item name="android:windowIsFloating">false</item>
+        <item name="android:windowNoTitle">true</item>
+        <item name="android:windowAnimationStyle">@style/Animation.AppCompat.Dialog</item>
+        <item name="android:windowSoftInputMode">adjustResize|stateVisible</item>
+    </style>
+</resources>

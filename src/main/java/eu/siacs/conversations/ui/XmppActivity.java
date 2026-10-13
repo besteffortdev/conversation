@@ -772,6 +772,9 @@ public abstract class XmppActivity extends ActionBarActivity {
     }
 
     protected void inviteToConversation(Conversation conversation) {
+        if (UserSearchDialog.showInvite(this, conversation)) {
+            return;
+        }
         startActivityForResult(
                 ChooseContactActivity.create(this, conversation), REQUEST_INVITE_TO_CONVERSATION);
     }

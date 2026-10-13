@@ -750,6 +750,9 @@ public class ConversationFragment extends XmppFragment
                                 .xmppConnectionService
                                 .archiveConversation(conversation);
                         return true;
+                    } else if (itemId == R.id.action_invite
+                            && UserSearchDialog.showInvite(requireXmppActivity(), conversation)) {
+                        return true;
                     } else if (itemId == R.id.action_invite) {
                         startActivityForResult(
                                 ChooseContactActivity.create(requireActivity(), conversation),
