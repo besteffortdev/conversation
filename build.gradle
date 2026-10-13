@@ -97,6 +97,20 @@ dependencies {
 
 def signingPropertiesFile = rootProject.file('signing.properties')
 
+// This fork's builds are named after its latest release tag (<upstream version>-fork.N):
+// '2.20.4-fork.3' when built at that tag, '2.20.4-fork.3-2-g1a2b3c4' two commits later, with
+// '-dirty' for uncommitted changes. Without git or such a tag, upstream's name stays.
+def forkVersionName = null
+try {
+    def describe = providers.exec {
+        commandLine 'git', 'describe', '--tags', '--match', '*-fork.*', '--dirty'
+        ignoreExitValue = true
+    }.standardOutput.asText.get().trim()
+    forkVersionName = describe.isEmpty() ? null : describe
+} catch (Exception e) {
+    logger.warn("fork version name: git describe failed: ${e.message}")
+}
+
 java {
     toolchain {
         languageVersion = JavaLanguageVersion.of(25)
@@ -234,6 +248,12 @@ android {
         includeInApk = false
         includeInBundle = false
     }
+}
+
+if (forkVersionName != null) {
+    // the app info, BuildConfig.VERSION_NAME and the release show exactly the tag
+    android.defaultConfig.versionName = forkVersionName
+    android.productFlavors.getByName('free').versionNameSuffix = null
 }
 
 androidComponents {

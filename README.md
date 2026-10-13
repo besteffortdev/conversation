@@ -31,11 +31,14 @@ on version 2.20.4. It differs from upstream as follows:
   user directory, such as Openfire's search plugin or ejabberd's vjud, "Add contact" opens a full
   screen search. Matching users appear as you type, 20 at a time with "Load more" at the end of
   the list, and tapping one adds them as a contact. Clear the search to get "Manual XMPP
-  address", which opens the usual address dialog. "Invite contact"
-  and choosing the participants of a new private group use the same search, which there also
-  matches your contacts: the + next to a person selects them, the selected people stay listed
-  above the results while you search for more, and "Add" (or "Create") finishes. Servers without
-  a user directory get the usual dialog or contact list.
+  address", which opens the usual address dialog. "Invite contact" and choosing the participants
+  of a new private group use the same search, which there also matches your contacts: the + next
+  to a person selects them, the selected people stay listed above the results while you search
+  for more, and "Add" (or "Create") finishes. Servers without a user directory get the usual
+  dialog or contact list.
+* **Version names.** Builds are named after this fork's release tags, such as `2.20.4-fork.3`,
+  instead of `2.20.4+free`. A build made after a release adds the commits since then, such as
+  `2.20.4-fork.3-2-g1a2b3c4`.
 
 ---
 
