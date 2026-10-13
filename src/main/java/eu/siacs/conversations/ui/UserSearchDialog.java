@@ -69,6 +69,8 @@ public class UserSearchDialog extends DialogFragment {
     private static final String PICKER_TAG = "user_search_picker";
     private static final String ENTER_JID_TAG = "enter_jid";
     private static final long SEARCH_DELAY = 400;
+    // results shown at first, and added by each 'Load more'
+    private static final int PAGE_SIZE = 20;
 
     private final Handler handler = new Handler(Looper.getMainLooper());
     private final Runnable searchRunnable = this::search;
@@ -632,28 +634,71 @@ public class UserSearchDialog extends DialogFragment {
 
     private record Entry(Account account, UserSearchManager.Result result) {}
 
-    private class ResultAdapter extends RecyclerView.Adapter<ResultViewHolder> {
+    private class ResultAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder> {
+
+        private static final int TYPE_RESULT = 0;
+        private static final int TYPE_LOAD_MORE = 1;
 
         private List<Entry> entries = ImmutableList.of();
         private boolean showAccount = false;
+        // how many of the entries are shown; a 'Load more' row follows them while there are more
+        private int limit = PAGE_SIZE;
 
         public void setEntries(final List<Entry> entries, final boolean showAccount) {
             this.entries = entries;
             this.showAccount = showAccount;
+            this.limit = PAGE_SIZE;
             notifyDataSetChanged();
+        }
+
+        private int getShownCount() {
+            return Math.min(limit, entries.size());
+        }
+
+        private boolean hasMore() {
+            return entries.size() > limit;
+        }
+
+        private void loadMore() {
+            // a second tap while the row goes away
+            if (!hasMore()) {
+                return;
+            }
+            final int shown = getShownCount();
+            limit += PAGE_SIZE;
+            // the 'Load more' row makes way for the next results, and comes back after them if
+            // there are still more
+            notifyItemRemoved(shown);
+            notifyItemRangeInserted(shown, getItemCount() - shown);
+        }
+
+        @Override
+        public int getItemViewType(final int position) {
+            return position < getShownCount() ? TYPE_RESULT : TYPE_LOAD_MORE;
         }
 
         @NonNull
         @Override
-        public ResultViewHolder onCreateViewHolder(
+        public RecyclerView.ViewHolder onCreateViewHolder(
                 @NonNull final ViewGroup parent, final int viewType) {
+            final var inflater = LayoutInflater.from(parent.getContext());
+            if (viewType == TYPE_LOAD_MORE) {
+                final var view =
+                        inflater.inflate(R.layout.item_user_search_load_more, parent, false);
+                view.findViewById(R.id.load_more).setOnClickListener(v -> loadMore());
+                return new LoadMoreViewHolder(view);
+            }
             return new ResultViewHolder(
-                    ItemUserSearchResultBinding.inflate(
-                            LayoutInflater.from(parent.getContext()), parent, false));
+                    ItemUserSearchResultBinding.inflate(inflater, parent, false));
         }
 
         @Override
-        public void onBindViewHolder(@NonNull final ResultViewHolder holder, final int position) {
+        public void onBindViewHolder(
+                @NonNull final RecyclerView.ViewHolder viewHolder, final int position) {
+            // the 'Load more' row has nothing to bind
+            if (!(viewHolder instanceof ResultViewHolder holder)) {
+                return;
+            }
             final var entry = entries.get(position);
             final var result = entry.result();
             final var binding = holder.binding;
@@ -707,7 +752,14 @@ public class UserSearchDialog extends DialogFragment {
 
         @Override
         public int getItemCount() {
-            return entries.size();
+            return getShownCount() + (hasMore() ? 1 : 0);
+        }
+    }
+
+    private static class LoadMoreViewHolder extends RecyclerView.ViewHolder {
+
+        private LoadMoreViewHolder(final View view) {
+            super(view);
         }
     }
 

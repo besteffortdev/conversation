@@ -20,4 +20,5 @@
         <item quantity="one">%d selected</item>
         <item quantity="other">%d selected</item>
     </plurals>
+    <string name="load_more">Load more</string>
 </resources>

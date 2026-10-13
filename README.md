@@ -29,8 +29,9 @@ on version 2.20.4. It differs from upstream as follows:
 * **User search when adding a contact, inviting people or creating a private group
   ([XEP-0055](https://xmpp.org/extensions/xep-0055.html) Jabber Search).** If your server has a
   user directory, such as Openfire's search plugin or ejabberd's vjud, "Add contact" opens a full
-  screen search. Matching users appear as you type, and tapping one adds them as a contact. Clear
-  the search to get "Manual XMPP address", which opens the usual address dialog. "Invite contact"
+  screen search. Matching users appear as you type, 20 at a time with "Load more" at the end of
+  the list, and tapping one adds them as a contact. Clear the search to get "Manual XMPP
+  address", which opens the usual address dialog. "Invite contact"
   and choosing the participants of a new private group use the same search, which there also
   matches your contacts: the + next to a person selects them, the selected people stay listed
   above the results while you search for more, and "Add" (or "Create") finishes. Servers without
