@@ -1,6 +1,7 @@
 package eu.siacs.conversations.ui;
 
-import android.app.Dialog;
+import android.graphics.Color;
+import android.os.Build;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
@@ -9,13 +10,15 @@ import android.text.TextWatcher;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
-import android.view.WindowManager;
 import androidx.annotation.NonNull;
+import androidx.annotation.Nullable;
 import androidx.core.content.ContextCompat;
+import androidx.core.view.ViewCompat;
+import androidx.core.view.WindowCompat;
+import androidx.core.view.WindowInsetsCompat;
 import androidx.databinding.DataBindingUtil;
 import androidx.fragment.app.DialogFragment;
 import androidx.recyclerview.widget.RecyclerView;
-import com.google.android.material.dialog.MaterialAlertDialogBuilder;
 import com.google.common.base.Strings;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Iterables;
@@ -35,8 +38,8 @@ import java.util.List;
 import java.util.Objects;
 
 /**
- * 'Add contact' with XEP-0055 user search: a search field over the users found on the servers of
- * the accounts, with a way out to the regular dialog for entering an address by hand.
+ * Full screen 'Add contact' with XEP-0055 user search: a search field over the users found on the
+ * servers of the accounts, with a way out to the regular dialog for entering an address by hand.
  */
 public class UserSearchDialog extends DialogFragment {
 
@@ -73,17 +76,32 @@ public class UserSearchDialog extends DialogFragment {
         return accounts;
     }
 
-    @NonNull
     @Override
-    public Dialog onCreateDialog(final Bundle savedInstanceState) {
-        final var builder = new MaterialAlertDialogBuilder(requireActivity());
-        builder.setTitle(R.string.add_contact);
-        binding =
-                DataBindingUtil.inflate(
-                        requireActivity().getLayoutInflater(),
-                        R.layout.dialog_user_search,
-                        null,
-                        false);
+    public void onCreate(@Nullable final Bundle savedInstanceState) {
+        super.onCreate(savedInstanceState);
+        setStyle(STYLE_NO_TITLE, R.style.ThemeOverlay_Conversations3_FullScreenDialog);
+    }
+
+    @Override
+    public View onCreateView(
+            @NonNull final LayoutInflater inflater,
+            @Nullable final ViewGroup container,
+            @Nullable final Bundle savedInstanceState) {
+        binding = DataBindingUtil.inflate(inflater, R.layout.dialog_user_search, container, false);
+        // the window is laid out edge to edge (see onStart), so keep clear of the system bars,
+        // the display cutout and the keyboard here
+        ViewCompat.setOnApplyWindowInsetsListener(
+                binding.getRoot(),
+                (view, windowInsets) -> {
+                    final var insets =
+                            windowInsets.getInsets(
+                                    WindowInsetsCompat.Type.systemBars()
+                                            | WindowInsetsCompat.Type.displayCutout()
+                                            | WindowInsetsCompat.Type.ime());
+                    view.setPadding(insets.left, insets.top, insets.right, insets.bottom);
+                    return WindowInsetsCompat.CONSUMED;
+                });
+        binding.toolbar.setNavigationOnClickListener(v -> dismiss());
         binding.results.setAdapter(adapter);
         binding.manualAddress.setOnClickListener(
                 v -> {
@@ -118,14 +136,30 @@ public class UserSearchDialog extends DialogFragment {
             binding.search.append(query);
         }
         binding.search.requestFocus();
-        builder.setView(binding.getRoot());
-        builder.setNegativeButton(R.string.cancel, null);
-        final var dialog = builder.create();
-        final var window = dialog.getWindow();
-        if (window != null) {
-            window.setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_STATE_VISIBLE);
+        return binding.getRoot();
+    }
+
+    @Override
+    public void onStart() {
+        super.onStart();
+        final var dialog = getDialog();
+        final var window = dialog == null ? null : dialog.getWindow();
+        if (window == null) {
+            return;
         }
-        return dialog;
+        window.setLayout(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT);
+        // edge to edge on every version, as Android 15+ enforces it anyway
+        WindowCompat.setDecorFitsSystemWindows(window, false);
+        final boolean lightMode = !Activities.isNightMode(requireContext());
+        final var insetsController =
+                WindowCompat.getInsetsController(window, window.getDecorView());
+        window.setStatusBarColor(Color.TRANSPARENT);
+        insetsController.setAppearanceLightStatusBars(lightMode);
+        // light navigation bar icons need Android 8
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            window.setNavigationBarColor(Color.TRANSPARENT);
+            insetsController.setAppearanceLightNavigationBars(lightMode);
+        }
     }
 
     @Override
