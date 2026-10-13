@@ -21,11 +21,23 @@
             android:scaleType="centerCrop"
             app:shapeAppearanceOverlay="@style/ShapeAppearance.RoundedCornersLight" />
 
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/select"
+            style="@style/Widget.Material3.Button.IconButton"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_alignParentEnd="true"
+            android:layout_centerVertical="true"
+            android:visibility="gone"
+            app:icon="@drawable/ic_add_24dp"
+            tools:visibility="visible" />
+
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_centerVertical="true"
             android:layout_marginStart="@dimen/avatar_item_distance"
+            android:layout_toStartOf="@+id/select"
             android:layout_toEndOf="@+id/avatar"
             android:orientation="vertical">
 
@@ -46,7 +58,7 @@
                 tools:text="juliet@capulet.example" />
 
             <TextView
-                android:id="@+id/account"
+                android:id="@+id/note"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:singleLine="true"

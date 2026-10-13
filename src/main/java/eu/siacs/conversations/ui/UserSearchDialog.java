@@ -1,5 +1,7 @@
 package eu.siacs.conversations.ui;
 
+import android.content.Intent;
+import android.content.res.ColorStateList;
 import android.graphics.Color;
 import android.os.Build;
 import android.os.Bundle;
@@ -10,6 +12,7 @@ import android.text.TextWatcher;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
+import android.widget.Toast;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.core.content.ContextCompat;
@@ -19,8 +22,12 @@ import androidx.core.view.WindowInsetsCompat;
 import androidx.databinding.DataBindingUtil;
 import androidx.fragment.app.DialogFragment;
 import androidx.recyclerview.widget.RecyclerView;
+import com.google.android.material.chip.Chip;
+import com.google.android.material.color.MaterialColors;
 import com.google.common.base.Strings;
+import com.google.common.collect.Collections2;
 import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
 import com.google.common.util.concurrent.FutureCallback;
 import com.google.common.util.concurrent.Futures;
@@ -30,25 +37,44 @@ import eu.siacs.conversations.R;
 import eu.siacs.conversations.databinding.DialogUserSearchBinding;
 import eu.siacs.conversations.databinding.ItemUserSearchResultBinding;
 import eu.siacs.conversations.entities.Account;
+import eu.siacs.conversations.entities.Conversation;
 import eu.siacs.conversations.services.AvatarService;
 import eu.siacs.conversations.services.XmppConnectionService;
+import eu.siacs.conversations.xmpp.Jid;
 import eu.siacs.conversations.xmpp.manager.UserSearchManager;
 import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
+import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
 
 /**
- * Full screen 'Add contact' with XEP-0055 user search: a search field over the users found on the
- * servers of the accounts, with a way out to the regular dialog for entering an address by hand.
+ * Full screen XEP-0055 user search over the users found on the servers of the accounts. It either
+ * adds one contact ('Add contact', with a way out to the regular dialog for entering an address by
+ * hand) or picks several people to invite into a conversation.
  */
 public class UserSearchDialog extends DialogFragment {
 
     private static final String QUERY_KEY = "query";
+    private static final String CONVERSATION_KEY = "conversation";
+    private static final String ACCOUNT_KEY = "account";
+    private static final String MEMBERS_KEY = "members";
+    private static final String SELECTED_ADDRESSES_KEY = "selected_addresses";
+    private static final String SELECTED_NAMES_KEY = "selected_names";
+    private static final String INVITE_TAG = "user_search_invite";
+    private static final String ENTER_JID_TAG = "enter_jid";
     private static final long SEARCH_DELAY = 400;
 
     private final Handler handler = new Handler(Looper.getMainLooper());
     private final Runnable searchRunnable = this::search;
     private final ResultAdapter adapter = new ResultAdapter();
+    // people picked for an invite, in the order they were picked
+    private final Map<Jid, UserSearchManager.Result> selected = new LinkedHashMap<>();
+    // people that are already in the conversation the invite is for
+    private Set<Jid> members = ImmutableSet.of();
 
     private DialogUserSearchBinding binding;
     // bumped on every change of the search term so that stale responses are ignored
@@ -62,24 +88,108 @@ public class UserSearchDialog extends DialogFragment {
         return dialog;
     }
 
+    /**
+     * Opens the search for inviting people into the conversation (a group chat, or a 1:1 chat that
+     * becomes one) if the server of its account has a user directory.
+     *
+     * @return false if there is no directory to search; the caller falls back to {@link
+     *     ChooseContactActivity}
+     */
+    public static boolean showInvite(final XmppActivity activity, final Conversation conversation) {
+        final var account = conversation.getAccount();
+        if (!isSearchable(account)) {
+            return false;
+        }
+        final var fragmentManager = activity.getSupportFragmentManager();
+        if (fragmentManager.findFragmentByTag(INVITE_TAG) != null) {
+            return true;
+        }
+        final var members = new ArrayList<String>();
+        if (conversation.getMode() == Conversation.MODE_MULTI) {
+            final var mucOptions = conversation.getMucOptions();
+            for (final var member : mucOptions.getMembers()) {
+                members.add(member.asBareJid().toString());
+            }
+            for (final var user : mucOptions.getOnlineUsers()) {
+                final var realJid = user.getRealJid();
+                if (realJid != null) {
+                    members.add(realJid.asBareJid().toString());
+                }
+            }
+        } else {
+            members.add(conversation.getAddress().asBareJid().toString());
+        }
+        final var dialog = new UserSearchDialog();
+        final var arguments = new Bundle();
+        arguments.putString(CONVERSATION_KEY, conversation.getUuid());
+        arguments.putString(ACCOUNT_KEY, account.getJid().asBareJid().toString());
+        arguments.putStringArrayList(MEMBERS_KEY, members);
+        dialog.setArguments(arguments);
+        dialog.show(fragmentManager, INVITE_TAG);
+        return true;
+    }
+
     public static List<Account> getSearchableAccounts(final XmppConnectionService service) {
         final var accounts = new ArrayList<Account>();
         for (final var account : service.getAccounts()) {
-            if (account.isEnabled()
-                    && account.isOnlineAndConnected()
-                    && account.getXmppConnection()
-                            .getManager(UserSearchManager.class)
-                            .hasFeature()) {
+            if (isSearchable(account)) {
                 accounts.add(account);
             }
         }
         return accounts;
     }
 
+    private static boolean isSearchable(final Account account) {
+        return account.isEnabled()
+                && account.isOnlineAndConnected()
+                && account.getXmppConnection().getManager(UserSearchManager.class).hasFeature();
+    }
+
+    private boolean isInvite() {
+        return requireArguments().getString(CONVERSATION_KEY) != null;
+    }
+
     @Override
     public void onCreate(@Nullable final Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setStyle(STYLE_NO_TITLE, R.style.ThemeOverlay_Conversations3_FullScreenDialog);
+        final var members = requireArguments().getStringArrayList(MEMBERS_KEY);
+        if (members != null) {
+            this.members = ImmutableSet.copyOf(Collections2.transform(members, Jid::of));
+        }
+        if (savedInstanceState != null) {
+            final var addresses = savedInstanceState.getStringArrayList(SELECTED_ADDRESSES_KEY);
+            final var names = savedInstanceState.getStringArrayList(SELECTED_NAMES_KEY);
+            if (addresses != null && names != null && addresses.size() == names.size()) {
+                for (int i = 0; i < addresses.size(); ++i) {
+                    final var address = Jid.of(addresses.get(i));
+                    selected.put(
+                            address, new UserSearchManager.Result(address, names.get(i), null));
+                }
+            }
+        }
+        // also reaches a dialog for entering an address that survived a configuration change
+        getChildFragmentManager()
+                .addFragmentOnAttachListener(
+                        (fragmentManager, fragment) -> {
+                            if (fragment instanceof EnterJidDialog enterJidDialog) {
+                                enterJidDialog.setOnEnterJidDialogPositiveListener(
+                                        this::onAddressEntered);
+                            }
+                        });
+    }
+
+    @Override
+    public void onSaveInstanceState(@NonNull final Bundle outState) {
+        super.onSaveInstanceState(outState);
+        final var addresses = new ArrayList<String>();
+        final var names = new ArrayList<String>();
+        for (final var result : selected.values()) {
+            addresses.add(result.address().toString());
+            names.add(result.name());
+        }
+        outState.putStringArrayList(SELECTED_ADDRESSES_KEY, addresses);
+        outState.putStringArrayList(SELECTED_NAMES_KEY, names);
     }
 
     @Override
@@ -102,9 +212,25 @@ public class UserSearchDialog extends DialogFragment {
                     return WindowInsetsCompat.CONSUMED;
                 });
         binding.toolbar.setNavigationOnClickListener(v -> dismiss());
+        if (isInvite()) {
+            binding.toolbar.setTitle(R.string.invite_contact);
+            binding.toolbar.inflateMenu(R.menu.user_search_invite);
+            binding.toolbar.setOnMenuItemClickListener(
+                    item -> {
+                        if (item.getItemId() == R.id.action_add) {
+                            invite();
+                            return true;
+                        }
+                        return false;
+                    });
+        }
         binding.results.setAdapter(adapter);
         binding.manualAddress.setOnClickListener(
                 v -> {
+                    if (isInvite()) {
+                        showEnterJidDialog();
+                        return;
+                    }
                     final var listener = getListener();
                     dismiss();
                     if (listener != null) {
@@ -136,6 +262,7 @@ public class UserSearchDialog extends DialogFragment {
             binding.search.append(query);
         }
         binding.search.requestFocus();
+        updateSelection();
         return binding.getRoot();
     }
 
@@ -197,12 +324,26 @@ public class UserSearchDialog extends DialogFragment {
         if (term.isEmpty() || !(getActivity() instanceof XmppActivity activity)) {
             return;
         }
-        if (activity.xmppConnectionService == null) {
+        final var service = activity.xmppConnectionService;
+        if (service == null) {
             // restored after a configuration change; the service will be back shortly
             handler.postDelayed(searchRunnable, SEARCH_DELAY);
             return;
         }
-        final var accounts = getSearchableAccounts(activity.xmppConnectionService);
+        final List<Account> accounts;
+        final List<Entry> contacts;
+        if (isInvite()) {
+            final var account =
+                    service.findAccountByJid(Jid.of(requireArguments().getString(ACCOUNT_KEY)));
+            accounts =
+                    account != null && isSearchable(account)
+                            ? ImmutableList.of(account)
+                            : ImmutableList.of();
+            contacts = account == null ? ImmutableList.of() : findContacts(account, term);
+        } else {
+            accounts = getSearchableAccounts(service);
+            contacts = ImmutableList.of();
+        }
         final int generation = this.generation;
         final List<ListenableFuture<List<Entry>>> futures = new ArrayList<>();
         for (final var account : accounts) {
@@ -219,12 +360,12 @@ public class UserSearchDialog extends DialogFragment {
                 new FutureCallback<>() {
                     @Override
                     public void onSuccess(final List<List<Entry>> lists) {
-                        onSearchResults(generation, accounts.size() > 1, lists);
+                        onSearchResults(generation, accounts.size() > 1, contacts, lists);
                     }
 
                     @Override
                     public void onFailure(@NonNull final Throwable throwable) {
-                        onSearchResults(generation, false, ImmutableList.of());
+                        onSearchResults(generation, false, contacts, ImmutableList.of());
                     }
                 },
                 ContextCompat.getMainExecutor(activity));
@@ -242,14 +383,48 @@ public class UserSearchDialog extends DialogFragment {
         return entries.build();
     }
 
+    // when inviting, existing contacts match too: people on other servers aren't in the directory
+    private static List<Entry> findContacts(final Account account, final String term) {
+        final var needle = term.toLowerCase(Locale.ROOT);
+        final var entries = new ImmutableList.Builder<Entry>();
+        for (final var contact : account.getRoster().getContacts()) {
+            final var address = contact.getAddress().asBareJid();
+            if (!contact.showInContactList() || contact.isSelf() || address.isDomainJid()) {
+                continue;
+            }
+            final var name = contact.getDisplayName();
+            if (address.toString().toLowerCase(Locale.ROOT).contains(needle)
+                    || (name != null && name.toLowerCase(Locale.ROOT).contains(needle))) {
+                entries.add(new Entry(account, new UserSearchManager.Result(address, name, null)));
+            }
+        }
+        return entries.build();
+    }
+
     private void onSearchResults(
-            final int generation, final boolean showAccount, final List<List<Entry>> lists) {
+            final int generation,
+            final boolean showAccount,
+            final List<Entry> contacts,
+            final List<List<Entry>> lists) {
         if (generation != this.generation || binding == null || !isAdded()) {
             return;
         }
         binding.progress.setVisibility(View.INVISIBLE);
-        final var entries =
-                ImmutableList.copyOf(Iterables.concat(Iterables.filter(lists, Objects::nonNull)));
+        // the same person can be both a contact and in the directory
+        final var merged = new LinkedHashMap<String, Entry>();
+        for (final var entry :
+                Iterables.concat(
+                        contacts, Iterables.concat(Iterables.filter(lists, Objects::nonNull)))) {
+            final var key = entry.account().getJid().asBareJid() + "\0" + entry.result().address();
+            final var existing = merged.get(key);
+            if (existing == null
+                    || (existing.result().name() == null && entry.result().name() != null)) {
+                merged.put(key, entry);
+            }
+        }
+        final var entries = new ArrayList<>(merged.values());
+        entries.sort(
+                Comparator.comparing(e -> e.result().getDisplayName().toLowerCase(Locale.ROOT)));
         adapter.setEntries(entries, showAccount);
         binding.results.setVisibility(entries.isEmpty() ? View.GONE : View.VISIBLE);
         if (entries.isEmpty()) {
@@ -267,6 +442,102 @@ public class UserSearchDialog extends DialogFragment {
         if (listener != null) {
             listener.onUserSelected(entry.account(), entry.result());
         }
+    }
+
+    private void toggle(final UserSearchManager.Result result) {
+        if (selected.remove(result.address()) == null) {
+            selected.put(result.address(), result);
+        }
+        updateSelection();
+    }
+
+    private void updateSelection() {
+        if (binding == null || !isInvite()) {
+            return;
+        }
+        final var add = binding.toolbar.getMenu().findItem(R.id.action_add);
+        if (add != null) {
+            add.setEnabled(!selected.isEmpty());
+        }
+        binding.toolbar.setSubtitle(
+                selected.isEmpty()
+                        ? null
+                        : getResources()
+                                .getQuantityString(
+                                        R.plurals.users_selected,
+                                        selected.size(),
+                                        selected.size()));
+        final var inflater = LayoutInflater.from(binding.selected.getContext());
+        binding.selected.removeAllViews();
+        for (final var result : selected.values()) {
+            final var chip =
+                    (Chip)
+                            inflater.inflate(
+                                    R.layout.item_user_search_chip, binding.selected, false);
+            chip.setText(result.getDisplayName());
+            chip.setOnCloseIconClickListener(v -> toggle(result));
+            binding.selected.addView(chip);
+        }
+        binding.selectedScroll.setVisibility(selected.isEmpty() ? View.GONE : View.VISIBLE);
+        // keep the latest pick in view; fullScroll() would take the focus off the search field
+        binding.selectedScroll.post(
+                () -> {
+                    if (binding != null) {
+                        binding.selectedScroll.smoothScrollTo(binding.selected.getWidth(), 0);
+                    }
+                });
+        adapter.notifyDataSetChanged();
+    }
+
+    private void showEnterJidDialog() {
+        final var account = requireArguments().getString(ACCOUNT_KEY);
+        final var accounts = new ArrayList<String>();
+        accounts.add(account);
+        EnterJidDialog.newInstance(
+                        accounts,
+                        getString(R.string.enter_contact),
+                        getString(R.string.select),
+                        null,
+                        account,
+                        true,
+                        false)
+                .show(getChildFragmentManager(), ENTER_JID_TAG);
+    }
+
+    private boolean onAddressEntered(final Jid account, final Jid contact)
+            throws EnterJidDialog.JidError {
+        final var address = contact.asBareJid();
+        if (members.contains(address)) {
+            throw new EnterJidDialog.JidError(getString(R.string.already_in_this_chat));
+        }
+        if (!selected.containsKey(address)) {
+            toggle(new UserSearchManager.Result(address, null, null));
+        }
+        return true;
+    }
+
+    private void invite() {
+        if (selected.isEmpty()
+                || !(getActivity() instanceof XmppActivity activity)
+                || activity.xmppConnectionService == null) {
+            return;
+        }
+        // the same result ChooseContactActivity hands back, so the invite goes the same way
+        final var data = new Intent();
+        data.putExtra(
+                ChooseContactActivity.EXTRA_CONVERSATION,
+                requireArguments().getString(CONVERSATION_KEY));
+        data.putExtra(ChooseContactActivity.EXTRA_SELECT_MULTIPLE, true);
+        data.putExtra(
+                "contacts",
+                Collections2.transform(selected.keySet(), Jid::toString).toArray(new String[0]));
+        final var invite = XmppActivity.ConferenceInvite.parse(data);
+        if (invite != null && invite.execute(activity)) {
+            activity.mToast =
+                    Toast.makeText(activity, R.string.creating_conference, Toast.LENGTH_LONG);
+            activity.mToast.show();
+        }
+        dismiss();
     }
 
     private Listener getListener() {
@@ -314,16 +585,44 @@ public class UserSearchDialog extends DialogFragment {
                     result.name() == null ? result.email() : result.address().toString();
             binding.address.setText(secondLine);
             binding.address.setVisibility(secondLine == null ? View.GONE : View.VISIBLE);
+            final boolean member = isInvite() && members.contains(result.address());
             if (showAccount) {
-                binding.account.setText(
+                binding.note.setText(
                         context.getString(
                                 R.string.user_search_via_account,
                                 entry.account().getJid().asBareJid().toString()));
-                binding.account.setVisibility(View.VISIBLE);
+                binding.note.setVisibility(View.VISIBLE);
+            } else if (member) {
+                binding.note.setText(R.string.already_in_this_chat);
+                binding.note.setVisibility(View.VISIBLE);
             } else {
-                binding.account.setVisibility(View.GONE);
+                binding.note.setVisibility(View.GONE);
             }
-            binding.getRoot().setOnClickListener(v -> onEntrySelected(entry));
+            if (!isInvite()) {
+                binding.select.setVisibility(View.GONE);
+                binding.getRoot().setOnClickListener(v -> onEntrySelected(entry));
+                return;
+            }
+            if (member) {
+                binding.select.setVisibility(View.GONE);
+                binding.getRoot().setOnClickListener(null);
+                binding.getRoot().setClickable(false);
+                return;
+            }
+            final boolean isSelected = selected.containsKey(result.address());
+            binding.select.setVisibility(View.VISIBLE);
+            binding.select.setIconResource(
+                    isSelected ? R.drawable.ic_check_24dp : R.drawable.ic_add_24dp);
+            binding.select.setIconTint(
+                    isSelected
+                            ? ColorStateList.valueOf(
+                                    MaterialColors.getColor(
+                                            binding.select, androidx.appcompat.R.attr.colorPrimary))
+                            : holder.defaultIconTint);
+            binding.select.setContentDescription(
+                    context.getString(isSelected ? R.string.deselect : R.string.select));
+            binding.select.setOnClickListener(v -> toggle(result));
+            binding.getRoot().setOnClickListener(v -> toggle(result));
         }
 
         @Override
@@ -335,10 +634,12 @@ public class UserSearchDialog extends DialogFragment {
     private static class ResultViewHolder extends RecyclerView.ViewHolder {
 
         private final ItemUserSearchResultBinding binding;
+        private final ColorStateList defaultIconTint;
 
         private ResultViewHolder(final ItemUserSearchResultBinding binding) {
             super(binding.getRoot());
             this.binding = binding;
+            this.defaultIconTint = binding.select.getIconTint();
         }
     }
 }
