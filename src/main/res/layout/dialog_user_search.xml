@@ -8,6 +8,8 @@
         android:background="?colorSurface"
         android:orientation="vertical">
 
+        <!-- one row (back | search field | clear | Add/Create) so the header still fits a short
+             window, such as landscape with the keyboard open, split screen or an embedding pane -->
         <com.google.android.material.appbar.AppBarLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content">
@@ -17,57 +19,84 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:minHeight="?attr/actionBarSize"
+                app:contentInsetStartWithNavigation="0dp"
                 app:navigationContentDescription="@string/cancel"
-                app:navigationIcon="@drawable/ic_close_24dp"
-                app:title="@string/add_contact" />
+                app:navigationIcon="@drawable/ic_arrow_back_24dp">
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:gravity="center_vertical"
+                    android:orientation="horizontal">
+
+                    <EditText
+                        android:id="@+id/search"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:background="@null"
+                        android:imeOptions="actionSearch|flagNoExtractUi"
+                        android:importantForAutofill="no"
+                        android:inputType="textNoSuggestions"
+                        android:maxLines="1"
+                        android:minHeight="48dp"
+                        android:textAppearance="?textAppearanceBodyLarge" />
+
+                    <ImageButton
+                        android:id="@+id/clear_search"
+                        android:layout_width="48dp"
+                        android:layout_height="48dp"
+                        android:background="?selectableItemBackgroundBorderless"
+                        android:contentDescription="@string/clear_search"
+                        android:src="@drawable/ic_clear_24dp"
+                        android:visibility="gone" />
+                </LinearLayout>
+            </com.google.android.material.appbar.MaterialToolbar>
+
+            <com.google.android.material.progressindicator.LinearProgressIndicator
+                android:id="@+id/progress"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:indeterminate="true"
+                android:visibility="invisible" />
 
         </com.google.android.material.appbar.AppBarLayout>
 
-        <com.google.android.material.textfield.TextInputLayout
-            android:id="@+id/search_layout"
+        <!-- people picked so far, so they stay visible while searching for others -->
+        <LinearLayout
+            android:id="@+id/selected_row"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginHorizontal="16dp"
-            android:layout_marginTop="8dp"
-            android:hint="@string/search_users"
-            app:endIconMode="clear_text"
-            app:startIconDrawable="@drawable/ic_search_24dp">
-
-            <com.google.android.material.textfield.TextInputEditText
-                android:id="@+id/search"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:imeOptions="actionSearch|flagNoExtractUi"
-                android:inputType="textNoSuggestions"
-                android:maxLines="1" />
-        </com.google.android.material.textfield.TextInputLayout>
-
-        <!-- people picked so far when inviting, so they stay visible while searching for others -->
-        <HorizontalScrollView
-            android:id="@+id/selected_scroll"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="8dp"
-            android:clipToPadding="false"
-            android:paddingHorizontal="16dp"
-            android:scrollbars="none"
+            android:gravity="center_vertical"
+            android:orientation="horizontal"
+            android:paddingStart="16dp"
+            android:paddingTop="4dp"
+            android:paddingBottom="4dp"
             android:visibility="gone">
 
-            <com.google.android.material.chip.ChipGroup
-                android:id="@+id/selected"
+            <TextView
+                android:id="@+id/selected_count"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                app:singleLine="true" />
-        </HorizontalScrollView>
+                android:layout_marginEnd="8dp"
+                android:textAppearance="?textAppearanceLabelLarge" />
 
-        <com.google.android.material.progressindicator.LinearProgressIndicator
-            android:id="@+id/progress"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginHorizontal="16dp"
-            android:layout_marginTop="4dp"
-            android:indeterminate="true"
-            android:visibility="invisible" />
+            <HorizontalScrollView
+                android:id="@+id/selected_scroll"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:clipToPadding="false"
+                android:paddingEnd="16dp"
+                android:scrollbars="none">
+
+                <com.google.android.material.chip.ChipGroup
+                    android:id="@+id/selected"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    app:singleLine="true" />
+            </HorizontalScrollView>
+        </LinearLayout>
 
         <LinearLayout
             android:id="@+id/manual_address"
@@ -75,7 +104,7 @@
             android:layout_height="wrap_content"
             android:background="?selectableItemBackground"
             android:gravity="center_vertical"
-            android:minHeight="64dp"
+            android:minHeight="56dp"
             android:orientation="horizontal"
             android:paddingHorizontal="16dp">
 
