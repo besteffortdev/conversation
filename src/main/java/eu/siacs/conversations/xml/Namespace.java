@@ -37,6 +37,7 @@ public final class Namespace {
     public static final String ROSTER_VERSIONING = "urn:xmpp:features:rosterver";
     public static final String ROSTER_PRE_APPROVAL = "urn:xmpp:features:pre-approval";
     public static final String REGISTER = "jabber:iq:register";
+    public static final String SEARCH = "jabber:iq:search";
     public static final String REGISTER_STREAM_FEATURE = "http://jabber.org/features/iq-register";
     public static final String BYTE_STREAMS = "http://jabber.org/protocol/bytestreams";
     public static final String HTTP_UPLOAD = "urn:xmpp:http:upload:0";

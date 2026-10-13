@@ -84,6 +84,7 @@ import eu.siacs.conversations.xmpp.XmppConnection;
 import eu.siacs.conversations.xmpp.manager.BlockingManager;
 import eu.siacs.conversations.xmpp.manager.BookmarkManager;
 import eu.siacs.conversations.xmpp.manager.MultiUserChatManager;
+import eu.siacs.conversations.xmpp.manager.UserSearchManager;
 import im.conversations.android.model.Bookmark;
 import im.conversations.android.model.DynamicTag;
 import im.conversations.android.model.ImmutableBookmark;
@@ -101,7 +102,8 @@ public class StartConversationActivity extends XmppActivity
                 CreatePrivateGroupChatDialog.CreateConferenceDialogListener,
                 JoinConferenceDialog.JoinConferenceDialogListener,
                 SwipeRefreshLayout.OnRefreshListener,
-                CreatePublicChannelDialog.CreatePublicChannelDialogListener {
+                CreatePublicChannelDialog.CreatePublicChannelDialogListener,
+                UserSearchDialog.Listener {
 
     private static final String PREF_KEY_CONTACT_INTEGRATION_CONSENT =
             "contact_list_integration_consent";
@@ -372,7 +374,7 @@ public class StartConversationActivity extends XmppActivity
                         showPublicChannelDialog();
                         return false;
                     } else if (itemId == R.id.create_contact) {
-                        showCreateContactDialog(prefilled, null);
+                        showAddContactDialog(prefilled, searchString);
                         return false;
                     } else {
                         return false;
@@ -639,6 +641,46 @@ public class StartConversationActivity extends XmppActivity
                     }
                 });
         dialog.show(ft, FRAGMENT_TAG_DIALOG);
+    }
+
+    // offers XEP-0055 user search first when a server supports it; a typed address goes straight
+    // to the manual dialog
+    private void showAddContactDialog(final String prefilledJid, final String searchString) {
+        if (prefilledJid != null
+                || !xmppConnectionServiceBound
+                || UserSearchDialog.getSearchableAccounts(xmppConnectionService).isEmpty()) {
+            showCreateContactDialog(prefilledJid, null);
+            return;
+        }
+        final FragmentTransaction ft = getSupportFragmentManager().beginTransaction();
+        final Fragment prev = getSupportFragmentManager().findFragmentByTag(FRAGMENT_TAG_DIALOG);
+        if (prev != null) {
+            ft.remove(prev);
+        }
+        ft.addToBackStack(null);
+        UserSearchDialog.newInstance(searchString).show(ft, FRAGMENT_TAG_DIALOG);
+    }
+
+    @Override
+    public void onManualAddressSelected() {
+        showCreateContactDialog(null, null);
+    }
+
+    @Override
+    public void onUserSelected(final Account account, final UserSearchManager.Result result) {
+        if (!xmppConnectionServiceBound) {
+            return;
+        }
+        final Contact contact = account.getRoster().getContact(result.address());
+        if (contact.isSelf() || contact.showInRoster()) {
+            switchToConversation(contact);
+            return;
+        }
+        if (result.name() != null) {
+            contact.setServerName(result.name());
+        }
+        xmppConnectionService.createContact(contact, null);
+        switchToConversationDoNotAppend(contact, null);
     }
 
     @SuppressLint("InflateParams")

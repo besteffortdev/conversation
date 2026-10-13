@@ -43,6 +43,7 @@ import eu.siacs.conversations.xmpp.manager.RosterManager;
 import eu.siacs.conversations.xmpp.manager.StanzaIdManager;
 import eu.siacs.conversations.xmpp.manager.StreamHostManager;
 import eu.siacs.conversations.xmpp.manager.UnifiedPushManager;
+import eu.siacs.conversations.xmpp.manager.UserSearchManager;
 import eu.siacs.conversations.xmpp.manager.VCardManager;
 
 public class Managers {
@@ -101,6 +102,7 @@ public class Managers {
                 .put(StanzaIdManager.class, new StanzaIdManager(context, connection))
                 .put(StreamHostManager.class, new StreamHostManager(context, connection))
                 .put(UnifiedPushManager.class, new UnifiedPushManager(context, connection))
+                .put(UserSearchManager.class, new UserSearchManager(context, connection))
                 .put(VCardManager.class, new VCardManager(context, connection))
                 .build();
     }
