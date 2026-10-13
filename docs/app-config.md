@@ -15,7 +15,7 @@ server credentials, callsign, quick messages, the plugin's notifications).
 
 | Key | Meaning |
 |---|---|
-| `xmpp_domain` | The server part of addresses. Manages the host and port of every account on this domain, at their defaults unless set below |
+| `xmpp_domain` | The server part of addresses. Manages the host and port of every account on this domain, at their defaults unless set below. Users sign in there with a username alone (see below) |
 | `xmpp_host` | Connect to this host instead of looking up the domain in DNS. Also turns on (and locks) `show_connection_options`, without which Conversations ignores an account's host |
 | `xmpp_port` | The port on that host. Default 5222 |
 | `xmpp_username` | A username (`alice`, with `xmpp_domain`) or a full address (`alice@example.com`, which needs no domain) |
@@ -66,6 +66,14 @@ accounts on the managed domain are read only; with `xmpp_enabled`, their on/off 
 locked. `XmppConnectionService.createAccount()` and `updateAccount()` put the managed values back
 into any account they save. The managed CA certificates don't show in "Remove trusted
 certificates".
+
+**Signing in.** With a domain set (`xmpp_domain`, or the domain of `xmpp_username`), the app
+skips the welcome screen: with no account yet it opens on the sign-in screen, as does deleting the
+last account, and the Back button there leaves the app. Its address field is labelled
+"Username" and always shows `@domain` after what is typed, so users type their username and
+password; the server's host and port are the MDM's and aren't shown. Typing an `@` makes it a
+full address field again, for an account on another server. An account the MDM added by itself
+shows there while it connects.
 
 **Removed.** A setting the MDM no longer sets goes back to its default. An account it no longer
 manages is unlocked and kept, with its history. A CA certificate it no longer sets is no longer

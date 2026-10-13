@@ -112,6 +112,7 @@ public class AppConfigTest {
         bundle.putString(AppConfig.KEY_USERNAME, "alice");
         bundle.putString(AppConfig.KEY_PASSWORD, " secret ");
         final AppConfig config = AppConfig.of(bundle);
+        Assert.assertEquals(Jid.of("example.com"), config.getDomain());
         Assert.assertEquals(Jid.of("alice@example.com"), config.getJid());
         Assert.assertEquals("a password is kept as it is", " secret ", config.getPassword());
         Assert.assertTrue(config.managesAccount(account("alice@example.com")));
@@ -127,6 +128,7 @@ public class AppConfigTest {
         bundle.putString(AppConfig.KEY_USERNAME, "alice@example.org/phone");
         final AppConfig config = AppConfig.of(bundle);
         Assert.assertEquals(Jid.of("alice@example.org"), config.getJid());
+        Assert.assertEquals("the account's server", Jid.of("example.org"), config.getDomain());
         Assert.assertNull("no password: the user types it", config.getPassword());
         Assert.assertTrue(config.managesServerOf(account("bob@example.org")));
     }
@@ -193,6 +195,7 @@ public class AppConfigTest {
         bundle.putString(AppConfig.KEY_HOST, "xmpp.example.com");
         bundle.putBoolean(AppConfig.KEY_ENABLED, false);
         Assert.assertTrue(AppConfig.of(bundle).isEmpty());
+        Assert.assertNull(AppConfig.of(bundle).getDomain());
     }
 
     @Test

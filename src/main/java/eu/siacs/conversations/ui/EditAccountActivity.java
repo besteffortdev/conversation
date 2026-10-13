@@ -34,6 +34,7 @@ import android.widget.ImageView;
 import android.widget.TextView;
 import android.widget.Toast;
 import androidx.annotation.NonNull;
+import androidx.annotation.Nullable;
 import androidx.appcompat.app.ActionBar;
 import androidx.appcompat.app.AlertDialog;
 import androidx.core.content.ContextCompat;
@@ -130,6 +131,10 @@ public class EditAccountActivity extends OmemoActivity
     private boolean mInitMode = false;
     private Boolean mForceRegister = null;
     private boolean mUsernameMode = false;
+
+    /** Signing in on the server the MDM sets: the address field takes a username for it. */
+    @Nullable private Jid mManagedDomain;
+
     private boolean mShowOptions = false;
     private Account mAccount;
     private final OnClickListener mCancelButtonClickListener =
@@ -280,6 +285,8 @@ public class EditAccountActivity extends OmemoActivity
                     }
 
                     final Jid jid;
+                    final boolean usernameOnly =
+                            mUsernameMode || isManagedUsername(binding.accountJid.getText());
                     try {
                         if (mUsernameMode) {
                             jid =
@@ -287,12 +294,18 @@ public class EditAccountActivity extends OmemoActivity
                                             binding.accountJid.getText().toString(),
                                             getUserModeDomain(),
                                             null);
+                        } else if (usernameOnly) {
+                            jid =
+                                    Jid.of(
+                                            binding.accountJid.getText().toString(),
+                                            mManagedDomain.toString(),
+                                            null);
                         } else {
                             jid = Jid.ofUserInput(binding.accountJid.getText().toString());
                             Resolver.checkDomain(jid);
                         }
                     } catch (final NullPointerException | IllegalArgumentException e) {
-                        if (mUsernameMode) {
+                        if (usernameOnly) {
                             binding.accountJidLayout.setError(getString(R.string.invalid_username));
                         } else {
                             binding.accountJidLayout.setError(getString(R.string.invalid_jid));
@@ -336,7 +349,7 @@ public class EditAccountActivity extends OmemoActivity
                     }
 
                     if (jid.getLocal() == null) {
-                        if (mUsernameMode) {
+                        if (usernameOnly) {
                             binding.accountJidLayout.setError(getString(R.string.invalid_username));
                         } else {
                             binding.accountJidLayout.setError(getString(R.string.invalid_jid));
@@ -402,6 +415,7 @@ public class EditAccountActivity extends OmemoActivity
                 @Override
                 public void onTextChanged(
                         final CharSequence s, final int start, final int before, final int count) {
+                    updateManagedDomainField();
                     updatePortLayout();
                     updateSaveButton();
                 }
@@ -418,7 +432,8 @@ public class EditAccountActivity extends OmemoActivity
                 @Override
                 public void onFocusChange(View view, boolean b) {
                     EditText et = (EditText) view;
-                    if (b) {
+                    // a username for the MDM's server: the label and "@server" say what to type
+                    if (b && !(mManagedDomain != null && view.getId() == R.id.account_jid)) {
                         int resId =
                                 mUsernameMode
                                         ? R.string.username
@@ -505,7 +520,8 @@ public class EditAccountActivity extends OmemoActivity
     private void deleteAccountAndReturnIfNecessary() {
         if (mInitMode
                 && mAccount != null
-                && !mAccount.isOptionSet(Account.OPTION_LOGGED_IN_SUCCESSFULLY)) {
+                && !mAccount.isOptionSet(Account.OPTION_LOGGED_IN_SUCCESSFULLY)
+                && !AppConfig.get(this).managesAccount(mAccount)) {
             xmppConnectionService.deleteAccount(mAccount);
         }
 
@@ -535,7 +551,7 @@ public class EditAccountActivity extends OmemoActivity
 
         final List<Account> accounts =
                 xmppConnectionService == null ? null : xmppConnectionService.getAccounts();
-        if (accounts != null && accounts.isEmpty() && Config.MAGIC_CREATE_DOMAIN != null) {
+        if (accounts != null && accounts.isEmpty() && hasWelcomeScreen()) {
             Intent intent =
                     SignupUtils.getSignUpIntent(this, mForceRegister != null && mForceRegister);
             StartConversationActivity.addInviteUri(intent, this);
@@ -768,7 +784,7 @@ public class EditAccountActivity extends OmemoActivity
         if (mUsernameMode) {
             unmodified = this.mAccount.getJid().getLocal();
         } else {
-            unmodified = this.mAccount.getJid().asBareJid().toString();
+            unmodified = toAddressText(this.mAccount.getJid());
         }
         return !unmodified.equals(this.binding.accountJid.getText().toString());
     }
@@ -930,8 +946,7 @@ public class EditAccountActivity extends OmemoActivity
                 configureActionBar(getSupportActionBar(), !openedFromNotification);
             } else {
                 this.binding.avater.setVisibility(View.GONE);
-                configureActionBar(
-                        getSupportActionBar(), !(init && Config.MAGIC_CREATE_DOMAIN == null));
+                configureActionBar(getSupportActionBar(), !(init && !hasWelcomeScreen()));
                 if (mForceRegister != null) {
                     if (mForceRegister) {
                         setTitle(R.string.register_new_account);
@@ -1022,7 +1037,10 @@ public class EditAccountActivity extends OmemoActivity
 
         } else if (this.jidToEdit != null) {
             this.mAccount = xmppConnectionService.findAccountByJid(jidToEdit);
+        } else if (getIntent().getBooleanExtra("init", false)) {
+            this.mAccount = getManagedAccountToSignIn();
         }
+        this.mManagedDomain = getManagedDomainToSignIn();
 
         if (mAccount != null) {
             this.mInitMode |= this.mAccount.isOptionSet(Account.OPTION_REGISTER);
@@ -1036,13 +1054,12 @@ public class EditAccountActivity extends OmemoActivity
             updateAccountInformation(init);
         }
 
-        if (Config.MAGIC_CREATE_DOMAIN == null
-                && this.xmppConnectionService.getAccounts().size() == 0) {
+        if (!hasWelcomeScreen() && this.xmppConnectionService.getAccounts().size() == 0) {
             this.binding.cancelButton.setEnabled(false);
         }
         if (mUsernameMode) {
             this.binding.accountJidLayout.setHint(getString(R.string.username_hint));
-        } else {
+        } else if (mManagedDomain == null) {
             final KnownHostsAdapter mKnownHostsAdapter =
                     new KnownHostsAdapter(
                             this,
@@ -1056,6 +1073,10 @@ public class EditAccountActivity extends OmemoActivity
             pendingUri = null;
         }
         suggestManagedAccount();
+        updateManagedDomainField();
+        if (mManagedDomain != null && mAccount == null && binding.accountJid.length() == 0) {
+            binding.accountJid.post(() -> SoftKeyboardUtils.showKeyboard(binding.accountJid));
+        }
         updatePortLayout();
         updateSaveButton();
         invalidateOptionsMenu();
@@ -1297,10 +1318,7 @@ public class EditAccountActivity extends OmemoActivity
             if (mUsernameMode) {
                 this.binding.accountJid.getEditableText().append(this.mAccount.getJid().getLocal());
             } else {
-                this.binding
-                        .accountJid
-                        .getEditableText()
-                        .append(this.mAccount.getJid().asBareJid().toString());
+                this.binding.accountJid.getEditableText().append(toAddressText(mAccount.getJid()));
             }
             this.binding.accountPassword.getEditableText().clear();
             this.binding.accountPassword.getEditableText().append(this.mAccount.getPassword());
@@ -1621,6 +1639,7 @@ public class EditAccountActivity extends OmemoActivity
             }
         }
         lockManagedFields();
+        updateManagedDomainField();
     }
 
     /** A new account starts with the address the MDM sets without a password to add it with. */
@@ -1633,8 +1652,80 @@ public class EditAccountActivity extends OmemoActivity
                 || this.binding.accountJid.getText().length() > 0) {
             return;
         }
-        this.binding.accountJid.setText(jid.toString(), false);
+        this.binding.accountJid.setText(toAddressText(jid), false);
         this.binding.accountPassword.requestFocus();
+    }
+
+    /** The server the MDM sets; null if none is. */
+    @Nullable
+    private Jid getManagedDomain() {
+        return QuickConversationsService.isConversations() ? AppConfig.get(this).getDomain() : null;
+    }
+
+    /** Whether signing up starts at the welcome screen: not when the MDM sets the server. */
+    private boolean hasWelcomeScreen() {
+        return Config.MAGIC_CREATE_DOMAIN != null && getManagedDomain() == null;
+    }
+
+    /**
+     * The account the MDM adds, which can exist before the first sign-in opens: shown connecting
+     * there instead of an empty form.
+     */
+    @Nullable
+    private Account getManagedAccountToSignIn() {
+        final Jid jid = AppConfig.get(this).getJid();
+        return jid == null ? null : xmppConnectionService.findAccountByJid(jid);
+    }
+
+    /** The server the MDM sets, when this screen signs in a new account or one on that server. */
+    @Nullable
+    private Jid getManagedDomainToSignIn() {
+        final Jid domain = getManagedDomain();
+        if (!mInitMode || domain == null) {
+            return null;
+        }
+        if (mAccount == null) {
+            return domain;
+        }
+        return domain.equals(mAccount.getDomain())
+                        && !mAccount.isOptionSet(Account.OPTION_MAGIC_CREATE)
+                ? domain
+                : null;
+    }
+
+    /** Whether the address field holds a username alone, for the server the MDM sets. */
+    private boolean isManagedUsername(final CharSequence text) {
+        return mManagedDomain != null && !mUsernameMode && TextUtils.indexOf(text, '@') < 0;
+    }
+
+    /** The address as the address field shows it: the username alone on the MDM's server. */
+    private String toAddressText(final Jid jid) {
+        if (mManagedDomain != null
+                && mManagedDomain.equals(jid.getDomain())
+                && jid.getLocal() != null) {
+            return jid.getLocal();
+        }
+        return jid.asBareJid().toString();
+    }
+
+    /**
+     * Signing in on the server the MDM sets: the address field asks for a username, with "@server"
+     * always shown after it, until a full address is typed. That server's host and port are the
+     * MDM's, so they aren't shown.
+     */
+    private void updateManagedDomainField() {
+        if (mManagedDomain == null) {
+            return;
+        }
+        final boolean username = isManagedUsername(binding.accountJid.getText());
+        final String hint =
+                getString(username ? R.string.username_hint : R.string.account_settings_jabber_id);
+        if (!TextUtils.equals(hint, binding.accountJidLayout.getHint())) {
+            binding.accountJidLayout.setHint(hint);
+        }
+        binding.accountJidLayout.setExpandedHintEnabled(false);
+        binding.accountJidLayout.setSuffixText(username ? "@" + mManagedDomain : null);
+        binding.namePort.setVisibility(mShowOptions && !username ? View.VISIBLE : View.GONE);
     }
 
     /** Fields the MDM sets (see {@link AppConfig}) are shown, not editable. */
@@ -1653,10 +1744,18 @@ public class EditAccountActivity extends OmemoActivity
             lock(this.binding.hostname);
             lock(this.binding.port);
             this.binding.portLayout.setEnabled(false);
-            managed = true;
+            // not for a username typed for the server the MDM sets: its host and port aren't shown
+            managed |= !isManagedUsername(this.binding.accountJid.getText());
         }
-        this.binding.accountJidLayout.setHelperText(
-                managed ? getString(R.string.managed_by_organization) : null);
+        final String helper = managed ? getString(R.string.managed_by_organization) : null;
+        if (!TextUtils.equals(helper, this.binding.accountJidLayout.getHelperText())) {
+            final CharSequence error = this.binding.accountJidLayout.getError();
+            this.binding.accountJidLayout.setHelperText(helper);
+            if (error != null) {
+                // a new helper text shows instead of the error
+                this.binding.accountJidLayout.setError(error);
+            }
+        }
     }
 
     private static void lock(final EditText editText) {
