@@ -54,24 +54,26 @@ import java.util.Set;
 /**
  * Full screen XEP-0055 user search over the users found on the servers of the accounts. It either
  * adds one contact ('Add contact', with a way out to the regular dialog for entering an address by
- * hand) or picks several people to invite into a conversation.
+ * hand) or picks several people, to invite into a conversation or to create a private group chat
+ * with.
  */
 public class UserSearchDialog extends DialogFragment {
 
     private static final String QUERY_KEY = "query";
     private static final String CONVERSATION_KEY = "conversation";
+    private static final String GROUP_NAME_KEY = "group_name";
     private static final String ACCOUNT_KEY = "account";
     private static final String MEMBERS_KEY = "members";
     private static final String SELECTED_ADDRESSES_KEY = "selected_addresses";
     private static final String SELECTED_NAMES_KEY = "selected_names";
-    private static final String INVITE_TAG = "user_search_invite";
+    private static final String PICKER_TAG = "user_search_picker";
     private static final String ENTER_JID_TAG = "enter_jid";
     private static final long SEARCH_DELAY = 400;
 
     private final Handler handler = new Handler(Looper.getMainLooper());
     private final Runnable searchRunnable = this::search;
     private final ResultAdapter adapter = new ResultAdapter();
-    // people picked for an invite, in the order they were picked
+    // people picked so far, in the order they were picked
     private final Map<Jid, UserSearchManager.Result> selected = new LinkedHashMap<>();
     // people that are already in the conversation the invite is for
     private Set<Jid> members = ImmutableSet.of();
@@ -100,10 +102,6 @@ public class UserSearchDialog extends DialogFragment {
         if (!isSearchable(account)) {
             return false;
         }
-        final var fragmentManager = activity.getSupportFragmentManager();
-        if (fragmentManager.findFragmentByTag(INVITE_TAG) != null) {
-            return true;
-        }
         final var members = new ArrayList<String>();
         if (conversation.getMode() == Conversation.MODE_MULTI) {
             final var mucOptions = conversation.getMucOptions();
@@ -119,14 +117,41 @@ public class UserSearchDialog extends DialogFragment {
         } else {
             members.add(conversation.getAddress().asBareJid().toString());
         }
-        final var dialog = new UserSearchDialog();
         final var arguments = new Bundle();
         arguments.putString(CONVERSATION_KEY, conversation.getUuid());
         arguments.putString(ACCOUNT_KEY, account.getJid().asBareJid().toString());
         arguments.putStringArrayList(MEMBERS_KEY, members);
-        dialog.setArguments(arguments);
-        dialog.show(fragmentManager, INVITE_TAG);
+        showPicker(activity, arguments);
         return true;
+    }
+
+    /**
+     * Opens the search for choosing the participants of a new private group chat if the server of
+     * the account has a user directory.
+     *
+     * @return false if there is no directory to search; the caller falls back to {@link
+     *     ChooseContactActivity}
+     */
+    public static boolean showCreateGroup(
+            final XmppActivity activity, final Account account, final String name) {
+        if (!isSearchable(account)) {
+            return false;
+        }
+        final var arguments = new Bundle();
+        arguments.putString(GROUP_NAME_KEY, name);
+        arguments.putString(ACCOUNT_KEY, account.getJid().asBareJid().toString());
+        showPicker(activity, arguments);
+        return true;
+    }
+
+    private static void showPicker(final XmppActivity activity, final Bundle arguments) {
+        final var fragmentManager = activity.getSupportFragmentManager();
+        if (fragmentManager.findFragmentByTag(PICKER_TAG) != null) {
+            return;
+        }
+        final var dialog = new UserSearchDialog();
+        dialog.setArguments(arguments);
+        dialog.show(fragmentManager, PICKER_TAG);
     }
 
     public static List<Account> getSearchableAccounts(final XmppConnectionService service) {
@@ -147,6 +172,15 @@ public class UserSearchDialog extends DialogFragment {
 
     private boolean isInvite() {
         return requireArguments().getString(CONVERSATION_KEY) != null;
+    }
+
+    private boolean isCreateGroup() {
+        return requireArguments().getString(GROUP_NAME_KEY) != null;
+    }
+
+    // picking several people, as opposed to adding one contact
+    private boolean isPicker() {
+        return isInvite() || isCreateGroup();
     }
 
     @Override
@@ -212,22 +246,31 @@ public class UserSearchDialog extends DialogFragment {
                     return WindowInsetsCompat.CONSUMED;
                 });
         binding.toolbar.setNavigationOnClickListener(v -> dismiss());
-        if (isInvite()) {
-            binding.toolbar.setTitle(R.string.invite_contact);
-            binding.toolbar.inflateMenu(R.menu.user_search_invite);
+        if (isPicker()) {
+            binding.toolbar.setTitle(
+                    isInvite() ? R.string.invite_contact : R.string.choose_participants);
+            binding.toolbar.inflateMenu(R.menu.user_search_picker);
+            binding.toolbar
+                    .getMenu()
+                    .findItem(R.id.action_add)
+                    .setTitle(isInvite() ? R.string.add : R.string.create);
             binding.toolbar.setOnMenuItemClickListener(
                     item -> {
-                        if (item.getItemId() == R.id.action_add) {
-                            invite();
-                            return true;
+                        if (item.getItemId() != R.id.action_add) {
+                            return false;
                         }
-                        return false;
+                        if (isInvite()) {
+                            invite();
+                        } else {
+                            createGroup();
+                        }
+                        return true;
                     });
         }
         binding.results.setAdapter(adapter);
         binding.manualAddress.setOnClickListener(
                 v -> {
-                    if (isInvite()) {
+                    if (isPicker()) {
                         showEnterJidDialog();
                         return;
                     }
@@ -332,7 +375,7 @@ public class UserSearchDialog extends DialogFragment {
         }
         final List<Account> accounts;
         final List<Entry> contacts;
-        if (isInvite()) {
+        if (isPicker()) {
             final var account =
                     service.findAccountByJid(Jid.of(requireArguments().getString(ACCOUNT_KEY)));
             accounts =
@@ -383,7 +426,8 @@ public class UserSearchDialog extends DialogFragment {
         return entries.build();
     }
 
-    // when inviting, existing contacts match too: people on other servers aren't in the directory
+    // when picking people, existing contacts match too: people on other servers aren't in the
+    // directory
     private static List<Entry> findContacts(final Account account, final String term) {
         final var needle = term.toLowerCase(Locale.ROOT);
         final var entries = new ImmutableList.Builder<Entry>();
@@ -452,7 +496,7 @@ public class UserSearchDialog extends DialogFragment {
     }
 
     private void updateSelection() {
-        if (binding == null || !isInvite()) {
+        if (binding == null || !isPicker()) {
             return;
         }
         final var add = binding.toolbar.getMenu().findItem(R.id.action_add);
@@ -540,6 +584,36 @@ public class UserSearchDialog extends DialogFragment {
         dismiss();
     }
 
+    private void createGroup() {
+        if (selected.isEmpty()
+                || !(getActivity() instanceof XmppActivity activity)
+                || activity.xmppConnectionService == null) {
+            return;
+        }
+        final var arguments = requireArguments();
+        final var account =
+                activity.xmppConnectionService.findAccountByJid(
+                        Jid.of(arguments.getString(ACCOUNT_KEY)));
+        if (account == null) {
+            return;
+        }
+        // as StartConversationActivity does with the participants from ChooseContactActivity
+        final var future =
+                activity.xmppConnectionService.createAdhocConference(
+                        account,
+                        arguments.getString(GROUP_NAME_KEY),
+                        ImmutableList.copyOf(selected.keySet()));
+        Futures.addCallback(
+                future, activity.adhocCallback, ContextCompat.getMainExecutor(activity));
+        // when it's an immediate failure do not display 'creating group chat'
+        if (!future.isDone()) {
+            activity.mToast =
+                    Toast.makeText(activity, R.string.creating_conference, Toast.LENGTH_LONG);
+            activity.mToast.show();
+        }
+        dismiss();
+    }
+
     private Listener getListener() {
         return getActivity() instanceof Listener listener ? listener : null;
     }
@@ -585,7 +659,7 @@ public class UserSearchDialog extends DialogFragment {
                     result.name() == null ? result.email() : result.address().toString();
             binding.address.setText(secondLine);
             binding.address.setVisibility(secondLine == null ? View.GONE : View.VISIBLE);
-            final boolean member = isInvite() && members.contains(result.address());
+            final boolean member = isPicker() && members.contains(result.address());
             if (showAccount) {
                 binding.note.setText(
                         context.getString(
@@ -598,7 +672,7 @@ public class UserSearchDialog extends DialogFragment {
             } else {
                 binding.note.setVisibility(View.GONE);
             }
-            if (!isInvite()) {
+            if (!isPicker()) {
                 binding.select.setVisibility(View.GONE);
                 binding.getRoot().setOnClickListener(v -> onEntrySelected(entry));
                 return;

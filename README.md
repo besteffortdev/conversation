@@ -25,14 +25,15 @@ on version 2.20.4. It differs from upstream as follows:
   up the XMPP account (domain, host, port, username, password, CA certificate, on/off) and set
   39 Conversations settings, which users then can't change. See
   [docs/app-config.md](docs/app-config.md).
-* **User search when adding a contact or inviting people
+* **User search when adding a contact, inviting people or creating a private group
   ([XEP-0055](https://xmpp.org/extensions/xep-0055.html) Jabber Search).** If your server has a
   user directory, such as Openfire's search plugin or ejabberd's vjud, "Add contact" opens a full
   screen search. Matching users appear as you type, and tapping one adds them as a contact. Clear
   the search to get "Manual XMPP address", which opens the usual address dialog. "Invite contact"
-  uses the same search, which there also matches your contacts: the + next to a person selects
-  them, the selected people stay listed above the results while you search for more, and "Add"
-  invites them all. Servers without a user directory get the usual dialog or contact list.
+  and choosing the participants of a new private group use the same search, which there also
+  matches your contacts: the + next to a person selects them, the selected people stay listed
+  above the results while you search for more, and "Add" (or "Create") finishes. Servers without
+  a user directory get the usual dialog or contact list.
 
 ---
 

@@ -1221,6 +1221,9 @@ public class StartConversationActivity extends XmppActivity
         if (account == null) {
             return;
         }
+        if (UserSearchDialog.showCreateGroup(this, account, name.trim())) {
+            return;
+        }
         Intent intent = new Intent(getApplicationContext(), ChooseContactActivity.class);
         intent.putExtra(ChooseContactActivity.EXTRA_SHOW_ENTER_JID, false);
         intent.putExtra(ChooseContactActivity.EXTRA_SELECT_MULTIPLE, true);
