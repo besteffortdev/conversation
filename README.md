@@ -39,6 +39,11 @@ on version 2.20.4. It differs from upstream as follows:
 * **Version names.** Builds are named after this fork's release tags, such as `2.20.4-fork.3`,
   instead of `2.20.4+free`. A build made after a release adds the commits since then, such as
   `2.20.4-fork.3-2-g1a2b3c4`.
+* **Version codes.** Each release has a higher version code than the one before, so an MDM
+  such as SOTI MobiControl takes it as a new version: upstream's code times 100 plus the release
+  number, `4218103` for `2.20.4-fork.3`. As upstream does, each APK adds its ABI, so the
+  arm64-v8a APK of `2.20.4-fork.3` is `421810304`. The 2.20.4 releases were rebuilt with these
+  codes; before, they all had upstream's `42181`.
 
 ---
 
