@@ -251,6 +251,13 @@ android {
 }
 
 if (forkVersionName != null) {
+    // An MDM such as SOTI MobiControl takes a new APK only with a new version code, so each
+    // release adds its N to upstream's code: 2.20.4-fork.3 is 100 * 42181 + 3, and its arm64 APK
+    // 421810304 (below). Builds on a newer upstream before its first fork tag have N = 0
+    def release = forkVersionName =~ /^(.+?)-fork\.(\d+)/
+    def forkNumber = release.find() && release.group(1) == android.defaultConfig.versionName
+            ? release.group(2) as int : 0
+    android.defaultConfig.versionCode = 100 * android.defaultConfig.versionCode + forkNumber
     // the app info, BuildConfig.VERSION_NAME and the release show exactly the tag
     android.defaultConfig.versionName = forkVersionName
     android.productFlavors.getByName('free').versionNameSuffix = null
