@@ -323,7 +323,7 @@ public class UserSearchDialog extends DialogFragment {
                     search();
                     return true;
                 });
-        fetchForms();
+        refreshDirectories();
         final var query = requireArguments().getString(QUERY_KEY);
         if (savedInstanceState == null && !Strings.isNullOrEmpty(query)) {
             binding.search.append(query);
@@ -426,14 +426,15 @@ public class UserSearchDialog extends DialogFragment {
         return getSearchableAccounts(service);
     }
 
-    // so that the first search doesn't wait for the directories to send their search forms
-    private void fetchForms() {
+    // picks up directories that came up after the account connected, and fetches the search forms
+    // so that the first search doesn't wait for them
+    private void refreshDirectories() {
         if (!(getActivity() instanceof XmppActivity activity)
                 || activity.xmppConnectionService == null) {
             return;
         }
         for (final var account : getAccounts(activity.xmppConnectionService)) {
-            account.getXmppConnection().getManager(UserSearchManager.class).fetchForms();
+            account.getXmppConnection().getManager(UserSearchManager.class).refresh();
         }
     }
 

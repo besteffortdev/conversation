@@ -7,6 +7,7 @@ import androidx.annotation.VisibleForTesting;
 import com.google.common.base.Joiner;
 import com.google.common.base.Stopwatch;
 import com.google.common.base.Strings;
+import com.google.common.collect.Collections2;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Iterables;
@@ -20,6 +21,7 @@ import eu.siacs.conversations.Config;
 import eu.siacs.conversations.xml.Namespace;
 import eu.siacs.conversations.xmpp.Jid;
 import eu.siacs.conversations.xmpp.XmppConnection;
+import im.conversations.android.xmpp.Entity;
 import im.conversations.android.xmpp.model.Extension;
 import im.conversations.android.xmpp.model.data.Data;
 import im.conversations.android.xmpp.model.data.Field;
@@ -99,11 +101,51 @@ public class UserSearchManager extends AbstractManager {
         return !getServices().isEmpty();
     }
 
-    /** Asks every directory for its search form, so that the first search doesn't wait for it. */
-    public void fetchForms() {
-        for (final var service : getServices()) {
-            getForm(service);
-        }
+    /**
+     * Asks the server again for its services, as the list from when the account connected misses a
+     * directory added or back up since, then asks every directory for its search form so that the
+     * first search doesn't wait for it.
+     */
+    public void refresh() {
+        final var stopwatch = Stopwatch.createStarted();
+        final var discoManager = getManager(DiscoManager.class);
+        final var domain = getAccount().getDomain();
+        // as on connect, but waiting for every service rather than stopping at the first that
+        // fails
+        final var discovery =
+                Futures.transformAsync(
+                        discoManager.items(Entity.discoItem(domain)),
+                        items ->
+                                Futures.successfulAsList(
+                                        Collections2.transform(
+                                                Collections2.filter(
+                                                        items,
+                                                        i ->
+                                                                i.getNode() == null
+                                                                        && !domain.equals(
+                                                                                i.getJid())),
+                                                i ->
+                                                        discoManager.info(
+                                                                Entity.discoItem(i.getJid()),
+                                                                null))),
+                        MoreExecutors.directExecutor());
+        // also when the server or one of its services doesn't answer
+        Futures.withTimeout(discovery, SEARCH_TIMEOUT, FUTURE_TIMEOUT_EXECUTOR)
+                .addListener(
+                        () -> {
+                            final var services = getServices();
+                            Log.d(
+                                    Config.LOGTAG,
+                                    getAccount().getJid().asBareJid()
+                                            + ": user directories "
+                                            + services
+                                            + " after "
+                                            + stopwatch.stop());
+                            for (final var service : services) {
+                                getForm(service);
+                            }
+                        },
+                        MoreExecutors.directExecutor());
     }
 
     /**
