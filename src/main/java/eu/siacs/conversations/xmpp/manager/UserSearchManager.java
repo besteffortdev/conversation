@@ -21,6 +21,7 @@ import eu.siacs.conversations.xmpp.XmppConnection;
 import im.conversations.android.xmpp.model.Extension;
 import im.conversations.android.xmpp.model.data.Data;
 import im.conversations.android.xmpp.model.data.Field;
+import im.conversations.android.xmpp.model.disco.info.InfoQuery;
 import im.conversations.android.xmpp.model.search.Email;
 import im.conversations.android.xmpp.model.search.First;
 import im.conversations.android.xmpp.model.search.Last;
@@ -39,7 +40,7 @@ import java.util.Map;
 import java.util.Objects;
 
 /**
- * XEP-0055: Jabber Search. Finds users in the directory of the account's server, for example
+ * XEP-0055: Jabber Search. Finds users in the directories of the account's server, for example
  * Openfire's search.example.com or ejabberd's vjud.example.com.
  */
 public class UserSearchManager extends AbstractManager {
@@ -60,33 +61,49 @@ public class UserSearchManager extends AbstractManager {
         super(context, connection);
     }
 
-    public Jid getService() {
-        final var services =
-                getManager(DiscoManager.class).findDiscoItemsByFeature(Namespace.SEARCH);
+    public List<Jid> getServices() {
+        return getServices(
+                getManager(DiscoManager.class).findDiscoItemsByFeature(Namespace.SEARCH));
+    }
+
+    /**
+     * Every user directory, as a server may have several (its own users in one, those of federated
+     * servers in another); without any, the first other search service.
+     */
+    @VisibleForTesting
+    static List<Jid> getServices(final Map<Jid, InfoQuery> services) {
+        final var directories = new ImmutableList.Builder<Jid>();
         Jid fallback = null;
         for (final var entry : services.entrySet()) {
             final var info = entry.getValue();
             if (info.hasIdentityWithCategoryAndType("directory", "user")) {
-                return entry.getKey();
-            }
-            // Openfire's MUC service also answers jabber:iq:search, but it searches rooms
-            if (fallback == null && !info.hasIdentityWithCategory("conference")) {
+                directories.add(entry.getKey());
+            } else if (fallback == null && !info.hasIdentityWithCategory("conference")) {
+                // Openfire's MUC service also answers jabber:iq:search, but it searches rooms
                 fallback = entry.getKey();
             }
         }
-        return fallback;
+        final var found = directories.build();
+        return found.isEmpty() && fallback != null ? ImmutableList.of(fallback) : found;
     }
 
     public boolean hasFeature() {
-        return getService() != null;
+        return !getServices().isEmpty();
     }
 
+    /** Searches every directory and merges their results. */
     public ListenableFuture<List<Result>> search(final String term) {
-        final var service = getService();
-        if (service == null) {
+        final var services = getServices();
+        if (services.isEmpty()) {
             return Futures.immediateFailedFuture(
                     new IllegalStateException("No user search service available"));
         }
+        // a directory that is down leaves the results of the others
+        return mergeSuccessful(
+                ImmutableList.copyOf(Lists.transform(services, service -> search(service, term))));
+    }
+
+    private ListenableFuture<List<Result>> search(final Jid service, final String term) {
         final var future =
                 Futures.transformAsync(
                         getForm(service),
@@ -163,6 +180,12 @@ public class UserSearchManager extends AbstractManager {
                                             MoreExecutors.directExecutor());
                                 }));
         // when a term is spread over several fields, one of them being refused is fine
+        return mergeSuccessful(futures);
+    }
+
+    /** The merged results of those that succeeded; the first error when none did. */
+    private static ListenableFuture<List<Result>> mergeSuccessful(
+            final List<ListenableFuture<List<Result>>> futures) {
         return Futures.transformAsync(
                 Futures.successfulAsList(futures),
                 lists -> {
