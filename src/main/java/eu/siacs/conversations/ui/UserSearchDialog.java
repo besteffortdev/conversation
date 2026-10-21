@@ -68,7 +68,7 @@ public class UserSearchDialog extends DialogFragment {
     private static final String SELECTED_NAMES_KEY = "selected_names";
     private static final String PICKER_TAG = "user_search_picker";
     private static final String ENTER_JID_TAG = "enter_jid";
-    private static final long SEARCH_DELAY = 400;
+    private static final long SEARCH_DELAY = 200;
     // results shown at first, and added by each 'Load more'
     private static final int PAGE_SIZE = 20;
 
@@ -81,8 +81,22 @@ public class UserSearchDialog extends DialogFragment {
     private Set<Jid> members = ImmutableSet.of();
 
     private DialogUserSearchBinding binding;
-    // bumped on every change of the search term so that stale responses are ignored
+    // bumped on every change of the search term and every search so that stale responses are
+    // ignored
     private int generation = 0;
+    // the current search: its term, the contacts matching it, and the answers of the directories
+    // so far (null for those that failed) while 'pending' of them haven't answered yet
+    private String searchTerm;
+    private List<Entry> searchContacts = ImmutableList.of();
+    private boolean searchShowsAccount = false;
+    private final List<List<Entry>> answers = new ArrayList<>();
+    private int pending = 0;
+    // shown until every directory has answered; the results of the term that was narrowed down
+    // to the current one, which the directories that haven't answered yet will most likely return
+    // again
+    private List<Entry> preview = ImmutableList.of();
+    // the term the results on screen match, null when there are none
+    private String shownTerm;
 
     public static UserSearchDialog newInstance(final String query) {
         final var dialog = new UserSearchDialog();
@@ -309,6 +323,7 @@ public class UserSearchDialog extends DialogFragment {
                     search();
                     return true;
                 });
+        fetchForms();
         final var query = requireArguments().getString(QUERY_KEY);
         if (savedInstanceState == null && !Strings.isNullOrEmpty(query)) {
             binding.search.append(query);
@@ -361,8 +376,10 @@ public class UserSearchDialog extends DialogFragment {
         final var text = binding.search.getText();
         binding.clearSearch.setVisibility(
                 text == null || text.length() == 0 ? View.GONE : View.VISIBLE);
-        if (getSearchTerm().isEmpty()) {
-            adapter.setEntries(ImmutableList.of(), false);
+        final var term = getSearchTerm();
+        if (term.isEmpty()) {
+            shownTerm = null;
+            adapter.setEntries(ImmutableList.of(), false, true);
             binding.progress.setVisibility(View.INVISIBLE);
             binding.status.setVisibility(View.GONE);
             binding.results.setVisibility(View.GONE);
@@ -370,7 +387,53 @@ public class UserSearchDialog extends DialogFragment {
         } else {
             binding.manualAddress.setVisibility(View.GONE);
             binding.progress.setVisibility(View.VISIBLE);
+            // a term that contains the one on screen only matches people that one matched, so
+            // narrow those down right away rather than wait for the directories
+            final var needle = term.toLowerCase(Locale.ROOT);
+            if (shownTerm != null && needle.contains(shownTerm.toLowerCase(Locale.ROOT))) {
+                final var entries =
+                        ImmutableList.copyOf(
+                                Iterables.filter(adapter.getEntries(), e -> matches(e, needle)));
+                shownTerm = term;
+                adapter.setEntries(entries, adapter.showsAccount(), true);
+                binding.results.setVisibility(entries.isEmpty() ? View.GONE : View.VISIBLE);
+                binding.status.setVisibility(View.GONE);
+            }
             handler.postDelayed(searchRunnable, SEARCH_DELAY);
+        }
+    }
+
+    private static boolean matches(final Entry entry, final String needle) {
+        final var result = entry.result();
+        return contains(result.address().toString(), needle)
+                || contains(result.name(), needle)
+                || contains(result.email(), needle);
+    }
+
+    private static boolean contains(final String value, final String needle) {
+        return value != null && value.toLowerCase(Locale.ROOT).contains(needle);
+    }
+
+    // the accounts whose directories are searched
+    private List<Account> getAccounts(final XmppConnectionService service) {
+        if (isPicker()) {
+            final var account =
+                    service.findAccountByJid(Jid.of(requireArguments().getString(ACCOUNT_KEY)));
+            return account != null && isSearchable(account)
+                    ? ImmutableList.of(account)
+                    : ImmutableList.of();
+        }
+        return getSearchableAccounts(service);
+    }
+
+    // so that the first search doesn't wait for the directories to send their search forms
+    private void fetchForms() {
+        if (!(getActivity() instanceof XmppActivity activity)
+                || activity.xmppConnectionService == null) {
+            return;
+        }
+        for (final var account : getAccounts(activity.xmppConnectionService)) {
+            account.getXmppConnection().getManager(UserSearchManager.class).fetchForms();
         }
     }
 
@@ -385,45 +448,65 @@ public class UserSearchDialog extends DialogFragment {
             handler.postDelayed(searchRunnable, SEARCH_DELAY);
             return;
         }
-        final List<Account> accounts;
+        final var accounts = getAccounts(service);
         final List<Entry> contacts;
         if (isPicker()) {
             final var account =
                     service.findAccountByJid(Jid.of(requireArguments().getString(ACCOUNT_KEY)));
-            accounts =
-                    account != null && isSearchable(account)
-                            ? ImmutableList.of(account)
-                            : ImmutableList.of();
             contacts = account == null ? ImmutableList.of() : findContacts(account, term);
         } else {
-            accounts = getSearchableAccounts(service);
             contacts = ImmutableList.of();
         }
-        final int generation = this.generation;
+        // a search again for the same term (the keyboard's search key) replaces the one before
+        final int generation = ++this.generation;
         final List<ListenableFuture<List<Entry>>> futures = new ArrayList<>();
         for (final var account : accounts) {
             final var manager = account.getXmppConnection().getManager(UserSearchManager.class);
-            futures.add(
-                    Futures.transform(
-                            manager.search(term),
-                            results -> toEntries(account, results),
-                            MoreExecutors.directExecutor()));
+            for (final var future : manager.search(term)) {
+                futures.add(
+                        Futures.transform(
+                                future,
+                                results -> toEntries(account, results),
+                                MoreExecutors.directExecutor()));
+            }
         }
+        searchTerm = term;
+        searchContacts = contacts;
+        searchShowsAccount = accounts.size() > 1;
+        answers.clear();
+        pending = futures.size();
+        preview = term.equals(shownTerm) ? adapter.getEntries() : ImmutableList.of();
         binding.progress.setVisibility(View.VISIBLE);
-        Futures.addCallback(
-                Futures.successfulAsList(futures),
-                new FutureCallback<>() {
-                    @Override
-                    public void onSuccess(final List<List<Entry>> lists) {
-                        onSearchResults(generation, accounts.size() > 1, contacts, lists);
-                    }
+        if (futures.isEmpty()) {
+            showResults();
+            return;
+        }
+        // each directory's answer is shown as it comes in
+        for (final var future : futures) {
+            Futures.addCallback(
+                    future,
+                    new FutureCallback<>() {
+                        @Override
+                        public void onSuccess(final List<Entry> entries) {
+                            onAnswer(generation, entries);
+                        }
 
-                    @Override
-                    public void onFailure(@NonNull final Throwable throwable) {
-                        onSearchResults(generation, false, contacts, ImmutableList.of());
-                    }
-                },
-                ContextCompat.getMainExecutor(activity));
+                        @Override
+                        public void onFailure(@NonNull final Throwable throwable) {
+                            onAnswer(generation, null);
+                        }
+                    },
+                    ContextCompat.getMainExecutor(activity));
+        }
+    }
+
+    private void onAnswer(final int generation, @Nullable final List<Entry> entries) {
+        if (generation != this.generation || binding == null || !isAdded()) {
+            return;
+        }
+        answers.add(entries);
+        pending--;
+        showResults();
     }
 
     private static List<Entry> toEntries(
@@ -457,20 +540,32 @@ public class UserSearchDialog extends DialogFragment {
         return entries.build();
     }
 
-    private void onSearchResults(
-            final int generation,
-            final boolean showAccount,
-            final List<Entry> contacts,
-            final List<List<Entry>> lists) {
-        if (generation != this.generation || binding == null || !isAdded()) {
-            return;
-        }
-        binding.progress.setVisibility(View.INVISIBLE);
-        // the same person can be both a contact and in the directory
-        final var merged = new LinkedHashMap<String, Entry>();
-        for (final var entry :
+    private void showResults() {
+        final boolean done = pending <= 0;
+        binding.progress.setVisibility(done ? View.INVISIBLE : View.VISIBLE);
+        final var found =
                 Iterables.concat(
-                        contacts, Iterables.concat(Iterables.filter(lists, Objects::nonNull)))) {
+                        searchContacts,
+                        Iterables.concat(Iterables.filter(answers, Objects::nonNull)));
+        final var entries = merge(done ? found : Iterables.concat(found, preview));
+        // 'Load more' stays as it was while the results of the same term come in
+        final boolean newTerm = !searchTerm.equals(shownTerm);
+        shownTerm = searchTerm;
+        adapter.setEntries(entries, searchShowsAccount, newTerm);
+        binding.results.setVisibility(entries.isEmpty() ? View.GONE : View.VISIBLE);
+        if (entries.isEmpty() && done) {
+            final boolean failed = Iterables.all(answers, Objects::isNull);
+            binding.status.setText(failed ? R.string.user_search_failed : R.string.no_users_found);
+            binding.status.setVisibility(View.VISIBLE);
+        } else {
+            binding.status.setVisibility(View.GONE);
+        }
+    }
+
+    private static List<Entry> merge(final Iterable<Entry> found) {
+        // the same person can be both a contact and in the directory, or in several directories
+        final var merged = new LinkedHashMap<String, Entry>();
+        for (final var entry : found) {
             final var key = entry.account().getJid().asBareJid() + "\0" + entry.result().address();
             final var existing = merged.get(key);
             if (existing == null
@@ -481,15 +576,7 @@ public class UserSearchDialog extends DialogFragment {
         final var entries = new ArrayList<>(merged.values());
         entries.sort(
                 Comparator.comparing(e -> e.result().getDisplayName().toLowerCase(Locale.ROOT)));
-        adapter.setEntries(entries, showAccount);
-        binding.results.setVisibility(entries.isEmpty() ? View.GONE : View.VISIBLE);
-        if (entries.isEmpty()) {
-            final boolean failed = Iterables.all(lists, Objects::isNull);
-            binding.status.setText(failed ? R.string.user_search_failed : R.string.no_users_found);
-            binding.status.setVisibility(View.VISIBLE);
-        } else {
-            binding.status.setVisibility(View.GONE);
-        }
+        return entries;
     }
 
     private void onEntrySelected(final Entry entry) {
@@ -644,11 +731,22 @@ public class UserSearchDialog extends DialogFragment {
         // how many of the entries are shown; a 'Load more' row follows them while there are more
         private int limit = PAGE_SIZE;
 
-        public void setEntries(final List<Entry> entries, final boolean showAccount) {
+        public void setEntries(
+                final List<Entry> entries, final boolean showAccount, final boolean resetLimit) {
             this.entries = entries;
             this.showAccount = showAccount;
-            this.limit = PAGE_SIZE;
+            if (resetLimit) {
+                this.limit = PAGE_SIZE;
+            }
             notifyDataSetChanged();
+        }
+
+        public List<Entry> getEntries() {
+            return entries;
+        }
+
+        public boolean showsAccount() {
+            return showAccount;
         }
 
         private int getShownCount() {
