@@ -1,8 +1,10 @@
 package eu.siacs.conversations.xmpp.manager;
 
 import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableMap;
 import eu.siacs.conversations.xmpp.Jid;
 import im.conversations.android.xml.XmlElementReader;
+import im.conversations.android.xmpp.model.disco.info.InfoQuery;
 import im.conversations.android.xmpp.model.search.Email;
 import im.conversations.android.xmpp.model.search.Nick;
 import im.conversations.android.xmpp.model.search.Search;
@@ -182,5 +184,54 @@ public class UserSearchManagerTest {
                         new UserSearchManager.Result(alice, "alice", null),
                         new UserSearchManager.Result(bob, "Bob", null)),
                 merged);
+    }
+
+    @Test
+    public void everyUserDirectoryIsSearchedButNotRooms() throws IOException {
+        final var search = Jid.of("search.example.com");
+        final var federated = Jid.of("directory.example.com");
+        Assert.assertEquals(
+                ImmutableList.of(search, federated),
+                UserSearchManager.getServices(
+                        ImmutableMap.of(
+                                search,
+                                info("directory", "user"),
+                                Jid.of("conference.example.com"),
+                                info("conference", "text"),
+                                federated,
+                                info("directory", "user"))));
+    }
+
+    @Test
+    public void withoutUserDirectoryTheFirstOtherSearchService() throws IOException {
+        final var vjud = Jid.of("vjud.example.com");
+        Assert.assertEquals(
+                ImmutableList.of(vjud),
+                UserSearchManager.getServices(
+                        ImmutableMap.of(
+                                Jid.of("conference.example.com"),
+                                info("conference", "text"),
+                                vjud,
+                                info("component", "generic"),
+                                Jid.of("other.example.com"),
+                                info("component", "generic"))));
+        Assert.assertEquals(
+                ImmutableList.of(),
+                UserSearchManager.getServices(
+                        ImmutableMap.of(
+                                Jid.of("conference.example.com"), info("conference", "text"))));
+    }
+
+    private static InfoQuery info(final String category, final String type) throws IOException {
+        return XmlElementReader.read(
+                String.format(
+                        """
+                        <query xmlns="http://jabber.org/protocol/disco#info">
+                          <identity category="%s" type="%s"/>
+                          <feature var="jabber:iq:search"/>
+                        </query>\
+                        """,
+                        category, type),
+                InfoQuery.class);
     }
 }
