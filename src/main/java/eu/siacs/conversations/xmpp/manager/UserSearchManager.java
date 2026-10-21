@@ -5,7 +5,9 @@ import android.util.Log;
 import androidx.annotation.NonNull;
 import androidx.annotation.VisibleForTesting;
 import com.google.common.base.Joiner;
+import com.google.common.base.Stopwatch;
 import com.google.common.base.Strings;
+import com.google.common.collect.Collections2;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Iterables;
@@ -14,10 +16,12 @@ import com.google.common.util.concurrent.FutureCallback;
 import com.google.common.util.concurrent.Futures;
 import com.google.common.util.concurrent.ListenableFuture;
 import com.google.common.util.concurrent.MoreExecutors;
+import com.google.common.util.concurrent.SettableFuture;
 import eu.siacs.conversations.Config;
 import eu.siacs.conversations.xml.Namespace;
 import eu.siacs.conversations.xmpp.Jid;
 import eu.siacs.conversations.xmpp.XmppConnection;
+import im.conversations.android.xmpp.Entity;
 import im.conversations.android.xmpp.model.Extension;
 import im.conversations.android.xmpp.model.data.Data;
 import im.conversations.android.xmpp.model.data.Field;
@@ -28,6 +32,7 @@ import im.conversations.android.xmpp.model.search.Last;
 import im.conversations.android.xmpp.model.search.Nick;
 import im.conversations.android.xmpp.model.search.Search;
 import im.conversations.android.xmpp.model.stanza.Iq;
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
@@ -55,7 +60,12 @@ public class UserSearchManager extends AbstractManager {
             Arrays.asList("user", "username", "name", "fn", "nick", "email", "first", "last");
     private static final int MAX_QUERIES = 4;
 
-    private final Map<Jid, Search> forms = new HashMap<>();
+    // requests have no timeout of their own, so a directory that never answers would keep its
+    // search going forever
+    private static final Duration SEARCH_TIMEOUT = Duration.ofSeconds(10);
+
+    // the search form of each service, or the request for it while it is on its way
+    private final Map<Jid, ListenableFuture<Search>> forms = new HashMap<>();
 
     public UserSearchManager(final Context context, final XmppConnection connection) {
         super(context, connection);
@@ -91,42 +101,107 @@ public class UserSearchManager extends AbstractManager {
         return !getServices().isEmpty();
     }
 
-    /** Searches every directory and merges their results. */
-    public ListenableFuture<List<Result>> search(final String term) {
+    /**
+     * Asks the server again for its services, as the list from when the account connected misses a
+     * directory added or back up since, then asks every directory for its search form so that the
+     * first search doesn't wait for it.
+     */
+    public void refresh() {
+        final var stopwatch = Stopwatch.createStarted();
+        final var discoManager = getManager(DiscoManager.class);
+        final var domain = getAccount().getDomain();
+        // as on connect, but waiting for every service rather than stopping at the first that
+        // fails
+        final var discovery =
+                Futures.transformAsync(
+                        discoManager.items(Entity.discoItem(domain)),
+                        items ->
+                                Futures.successfulAsList(
+                                        Collections2.transform(
+                                                Collections2.filter(
+                                                        items,
+                                                        i ->
+                                                                i.getNode() == null
+                                                                        && !domain.equals(
+                                                                                i.getJid())),
+                                                i ->
+                                                        discoManager.info(
+                                                                Entity.discoItem(i.getJid()),
+                                                                null))),
+                        MoreExecutors.directExecutor());
+        // also when the server or one of its services doesn't answer
+        Futures.withTimeout(discovery, SEARCH_TIMEOUT, FUTURE_TIMEOUT_EXECUTOR)
+                .addListener(
+                        () -> {
+                            final var services = getServices();
+                            Log.d(
+                                    Config.LOGTAG,
+                                    getAccount().getJid().asBareJid()
+                                            + ": user directories "
+                                            + services
+                                            + " after "
+                                            + stopwatch.stop());
+                            for (final var service : services) {
+                                getForm(service);
+                            }
+                        },
+                        MoreExecutors.directExecutor());
+    }
+
+    /**
+     * Searches every directory, with one future each, so that a slow directory doesn't hold back
+     * the results of the others.
+     */
+    public List<ListenableFuture<List<Result>>> search(final String term) {
         final var services = getServices();
         if (services.isEmpty()) {
-            return Futures.immediateFailedFuture(
-                    new IllegalStateException("No user search service available"));
+            return ImmutableList.of(
+                    Futures.immediateFailedFuture(
+                            new IllegalStateException("No user search service available")));
         }
-        // a directory that is down leaves the results of the others
-        return mergeSuccessful(
-                ImmutableList.copyOf(Lists.transform(services, service -> search(service, term))));
+        return ImmutableList.copyOf(Lists.transform(services, service -> search(service, term)));
     }
 
     private ListenableFuture<List<Result>> search(final Jid service, final String term) {
+        final var stopwatch = Stopwatch.createStarted();
+        final var form = getForm(service);
         final var future =
-                Futures.transformAsync(
-                        getForm(service),
-                        form -> search(service, form, term),
-                        MoreExecutors.directExecutor());
+                Futures.withTimeout(
+                        Futures.transformAsync(
+                                // the form is shared with other searches, so the timeout of this
+                                // one must not cancel it
+                                Futures.nonCancellationPropagating(form),
+                                f -> search(service, f, term),
+                                MoreExecutors.directExecutor()),
+                        SEARCH_TIMEOUT,
+                        FUTURE_TIMEOUT_EXECUTOR);
         Futures.addCallback(
                 future,
                 new FutureCallback<>() {
                     @Override
-                    public void onSuccess(final List<Result> results) {}
-
-                    @Override
-                    public void onFailure(@NonNull final Throwable throwable) {
-                        // fetch the form again next time in case the service changed it
-                        synchronized (forms) {
-                            forms.remove(service);
-                        }
+                    public void onSuccess(final List<Result> results) {
                         Log.d(
                                 Config.LOGTAG,
                                 getAccount().getJid().asBareJid()
                                         + ": user search on "
                                         + service
-                                        + " failed",
+                                        + " found "
+                                        + results.size()
+                                        + " in "
+                                        + stopwatch.stop());
+                    }
+
+                    @Override
+                    public void onFailure(@NonNull final Throwable throwable) {
+                        // fetch the form again next time in case the service changed it
+                        forgetForm(service, form);
+                        Log.d(
+                                Config.LOGTAG,
+                                getAccount().getJid().asBareJid()
+                                        + ": user search on "
+                                        + service
+                                        + " failed after "
+                                        + stopwatch.stop(),
                                 throwable);
                     }
                 },
@@ -135,28 +210,59 @@ public class UserSearchManager extends AbstractManager {
     }
 
     private ListenableFuture<Search> getForm(final Jid service) {
+        final SettableFuture<Search> form = SettableFuture.create();
         synchronized (this.forms) {
-            final var form = this.forms.get(service);
-            if (form != null) {
-                return Futures.immediateFuture(form);
+            final var cached = this.forms.get(service);
+            if (cached != null) {
+                return cached;
             }
+            this.forms.put(service, form);
         }
+        final var stopwatch = Stopwatch.createStarted();
         final var iq = new Iq(Iq.Type.GET);
         iq.setTo(service);
         iq.addExtension(new Search());
-        return Futures.transform(
-                connection.sendIqPacket(iq),
-                response -> {
-                    final var form = response.getExtension(Search.class);
-                    if (form == null) {
-                        throw new IllegalStateException("Service did not return a search form");
+        form.setFuture(
+                Futures.transform(
+                        connection.sendIqPacket(iq),
+                        response -> {
+                            final var search = response.getExtension(Search.class);
+                            if (search == null) {
+                                throw new IllegalStateException(
+                                        "Service did not return a search form");
+                            }
+                            Log.d(
+                                    Config.LOGTAG,
+                                    getAccount().getJid().asBareJid()
+                                            + ": fetched search form of "
+                                            + service
+                                            + " in "
+                                            + stopwatch.stop());
+                            return search;
+                        },
+                        MoreExecutors.directExecutor()));
+        Futures.addCallback(
+                form,
+                new FutureCallback<>() {
+                    @Override
+                    public void onSuccess(final Search search) {}
+
+                    @Override
+                    public void onFailure(@NonNull final Throwable throwable) {
+                        forgetForm(service, form);
                     }
-                    synchronized (this.forms) {
-                        this.forms.put(service, form);
-                    }
-                    return form;
                 },
                 MoreExecutors.directExecutor());
+        return form;
+    }
+
+    private void forgetForm(final Jid service, final ListenableFuture<Search> form) {
+        synchronized (this.forms) {
+            // unless it was replaced by a newer one already
+            if (this.forms.get(service) == form) {
+                this.forms.remove(service);
+            }
+        }
     }
 
     private ListenableFuture<List<Result>> search(
