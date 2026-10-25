@@ -33,8 +33,8 @@ on version 2.20.4. It differs from upstream as follows:
   another) gets them all searched at once. Matching users appear as you type, 20 at a time with "Load more" at the end of
   the list, and tapping one adds them as a contact. Clear the search to get "Manual XMPP
   address", which opens the usual address dialog. "Invite contact" and choosing the participants
-  of a new private group use the same search, which there also matches your contacts: the + next
-  to a person selects them, the selected people stay listed above the results while you search
+  of a new private group use the same search, which there also lists your contacts before you
+  type anything and narrows them down as you type: the + next to a person selects them, the selected people stay listed above the results while you search
   for more, and "Add" (or "Create") finishes. Servers without a user directory get the usual
   dialog or contact list.
 

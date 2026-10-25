@@ -327,6 +327,9 @@ public class UserSearchDialog extends DialogFragment {
         final var query = requireArguments().getString(QUERY_KEY);
         if (savedInstanceState == null && !Strings.isNullOrEmpty(query)) {
             binding.search.append(query);
+        } else {
+            // lists the contacts when picking; a restored search term comes back after this
+            onSearchTermChanged();
         }
         binding.search.requestFocus();
         updateSelection();
@@ -378,22 +381,29 @@ public class UserSearchDialog extends DialogFragment {
                 text == null || text.length() == 0 ? View.GONE : View.VISIBLE);
         final var term = getSearchTerm();
         if (term.isEmpty()) {
-            shownTerm = null;
-            adapter.setEntries(ImmutableList.of(), false, true);
+            showContacts();
             binding.progress.setVisibility(View.INVISIBLE);
             binding.status.setVisibility(View.GONE);
-            binding.results.setVisibility(View.GONE);
             binding.manualAddress.setVisibility(View.VISIBLE);
+            if (isPicker() && getService() == null) {
+                // restored after a configuration change; the service will be back shortly
+                handler.postDelayed(searchRunnable, SEARCH_DELAY);
+            }
         } else {
             binding.manualAddress.setVisibility(View.GONE);
             binding.progress.setVisibility(View.VISIBLE);
             // a term that contains the one on screen only matches people that one matched, so
-            // narrow those down right away rather than wait for the directories
+            // narrow those down right away rather than wait for the directories. When picking,
+            // the contacts that match are known right away too, whatever the change
             final var needle = term.toLowerCase(Locale.ROOT);
-            if (shownTerm != null && needle.contains(shownTerm.toLowerCase(Locale.ROOT))) {
+            if (isPicker()
+                    || (shownTerm != null && needle.contains(shownTerm.toLowerCase(Locale.ROOT)))) {
                 final var entries =
-                        ImmutableList.copyOf(
-                                Iterables.filter(adapter.getEntries(), e -> matches(e, needle)));
+                        merge(
+                                Iterables.concat(
+                                        findContacts(term),
+                                        Iterables.filter(
+                                                adapter.getEntries(), e -> matches(e, needle))));
                 shownTerm = term;
                 adapter.setEntries(entries, adapter.showsAccount(), true);
                 binding.results.setVisibility(entries.isEmpty() ? View.GONE : View.VISIBLE);
@@ -438,9 +448,24 @@ public class UserSearchDialog extends DialogFragment {
         }
     }
 
+    @Nullable
+    private XmppConnectionService getService() {
+        return getActivity() instanceof XmppActivity activity
+                ? activity.xmppConnectionService
+                : null;
+    }
+
+    // what is listed while nothing is typed: the contacts when picking people, nothing otherwise
+    private void showContacts() {
+        final var contacts = merge(findContacts(""));
+        shownTerm = isPicker() ? "" : null;
+        adapter.setEntries(contacts, false, true);
+        binding.results.setVisibility(contacts.isEmpty() ? View.GONE : View.VISIBLE);
+    }
+
     private void search() {
         final var term = getSearchTerm();
-        if (term.isEmpty() || !(getActivity() instanceof XmppActivity activity)) {
+        if (!(getActivity() instanceof XmppActivity activity)) {
             return;
         }
         final var service = activity.xmppConnectionService;
@@ -449,15 +474,15 @@ public class UserSearchDialog extends DialogFragment {
             handler.postDelayed(searchRunnable, SEARCH_DELAY);
             return;
         }
-        final var accounts = getAccounts(service);
-        final List<Entry> contacts;
-        if (isPicker()) {
-            final var account =
-                    service.findAccountByJid(Jid.of(requireArguments().getString(ACCOUNT_KEY)));
-            contacts = account == null ? ImmutableList.of() : findContacts(account, term);
-        } else {
-            contacts = ImmutableList.of();
+        if (term.isEmpty()) {
+            // the contacts weren't listed while the service was away
+            if (isPicker()) {
+                showContacts();
+            }
+            return;
         }
+        final var accounts = getAccounts(service);
+        final var contacts = findContacts(term);
         // a search again for the same term (the keyboard's search key) replaces the one before
         final int generation = ++this.generation;
         final List<ListenableFuture<List<Entry>>> futures = new ArrayList<>();
@@ -523,7 +548,17 @@ public class UserSearchDialog extends DialogFragment {
     }
 
     // when picking people, existing contacts match too: people on other servers aren't in the
-    // directory
+    // directory. All of them match an empty term, as they're listed before anything is typed
+    private List<Entry> findContacts(final String term) {
+        final var service = getService();
+        if (!isPicker() || service == null) {
+            return ImmutableList.of();
+        }
+        final var account =
+                service.findAccountByJid(Jid.of(requireArguments().getString(ACCOUNT_KEY)));
+        return account == null ? ImmutableList.of() : findContacts(account, term);
+    }
+
     private static List<Entry> findContacts(final Account account, final String term) {
         final var needle = term.toLowerCase(Locale.ROOT);
         final var entries = new ImmutableList.Builder<Entry>();
