@@ -643,12 +643,12 @@ public class StartConversationActivity extends XmppActivity
         dialog.show(ft, FRAGMENT_TAG_DIALOG);
     }
 
-    // offers XEP-0055 user search first when a server supports it; a typed address goes straight
-    // to the manual dialog
+    // offers XEP-0055 user search first unless the servers turned out not to support it; a typed
+    // address goes straight to the manual dialog
     private void showAddContactDialog(final String prefilledJid, final String searchString) {
         if (prefilledJid != null
                 || !xmppConnectionServiceBound
-                || UserSearchDialog.getSearchableAccounts(xmppConnectionService).isEmpty()) {
+                || !UserSearchDialog.isAvailable(xmppConnectionService)) {
             showCreateContactDialog(prefilledJid, null);
             return;
         }
