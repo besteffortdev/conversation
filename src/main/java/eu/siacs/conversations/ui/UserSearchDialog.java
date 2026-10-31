@@ -415,8 +415,7 @@ public class UserSearchDialog extends DialogFragment
         if (term.isEmpty()) {
             showContacts();
             binding.progress.setVisibility(View.INVISIBLE);
-            showConnectionStatus();
-            binding.manualAddress.setVisibility(View.VISIBLE);
+            showAccountStatus();
         } else {
             binding.manualAddress.setVisibility(View.GONE);
             binding.progress.setVisibility(View.VISIBLE);
@@ -435,7 +434,7 @@ public class UserSearchDialog extends DialogFragment
                 shownTerm = term;
                 adapter.setEntries(entries, adapter.showsAccount(), true);
                 binding.results.setVisibility(entries.isEmpty() ? View.GONE : View.VISIBLE);
-                showConnectionStatus();
+                showAccountStatus();
             }
             handler.postDelayed(searchRunnable, SEARCH_DELAY);
         }
@@ -556,7 +555,7 @@ public class UserSearchDialog extends DialogFragment
             if (isPicker()) {
                 showContacts();
             }
-            showConnectionStatus();
+            showAccountStatus();
             return;
         }
         final var accounts = getSearchableAccounts(service);
@@ -674,15 +673,19 @@ public class UserSearchDialog extends DialogFragment
             binding.status.setText(failed ? R.string.user_search_failed : R.string.no_users_found);
             binding.status.setVisibility(View.VISIBLE);
         } else {
-            showConnectionStatus();
+            showAccountStatus();
         }
     }
 
-    private void showConnectionStatus() {
+    private void showAccountStatus() {
         if (unavailable != 0) {
             binding.status.setText(unavailable);
         }
         binding.status.setVisibility(unavailable != 0 ? View.VISIBLE : View.GONE);
+        // a disabled account can't add anyone, so entering an address would lead nowhere
+        final boolean canEnterAddress =
+                getSearchTerm().isEmpty() && unavailable != R.string.this_account_is_disabled;
+        binding.manualAddress.setVisibility(canEnterAddress ? View.VISIBLE : View.GONE);
     }
 
     private static List<Entry> merge(final Iterable<Entry> found) {
