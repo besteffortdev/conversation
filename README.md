@@ -36,8 +36,8 @@ on version 2.20.4. It differs from upstream as follows:
   of a new private group use the same search, which there also lists your contacts before you
   type anything and narrows them down as you type: the + next to a person selects them, the selected people stay listed above the results while you search
   for more, and "Add" (or "Create") finishes. The search also opens while your account isn't
-  connected, says so, and starts over once it is. Servers without a user directory get the usual
-  dialog or contact list.
+  connected or is disabled, says so, and starts over once it's back. Servers without a user
+  directory get the usual dialog or contact list.
 
 
 ---

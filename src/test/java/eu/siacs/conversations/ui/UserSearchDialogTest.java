@@ -1,5 +1,6 @@
 package eu.siacs.conversations.ui;
 
+import com.google.common.collect.ImmutableList;
 import eu.siacs.conversations.entities.Account;
 import eu.siacs.conversations.xmpp.Jid;
 import org.junit.Assert;
@@ -45,9 +46,14 @@ public class UserSearchDialogTest {
     }
 
     @Test
-    public void searchDoesNotOpenForDisabledAccounts() {
+    public void searchOpensWhenEveryAccountIsDisabled() {
         final var account = account();
         account.setOption(Account.OPTION_DISABLED, true);
-        Assert.assertFalse(UserSearchDialog.isAvailable(account));
+        Assert.assertTrue(UserSearchDialog.isAvailable(ImmutableList.of(account)));
+    }
+
+    @Test
+    public void searchDoesNotOpenWithoutAccounts() {
+        Assert.assertFalse(UserSearchDialog.isAvailable(ImmutableList.<Account>of()));
     }
 }

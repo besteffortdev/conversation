@@ -15,6 +15,7 @@ import android.view.ViewGroup;
 import android.widget.Toast;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
+import androidx.annotation.StringRes;
 import androidx.annotation.VisibleForTesting;
 import androidx.core.content.ContextCompat;
 import androidx.core.view.ViewCompat;
@@ -105,8 +106,8 @@ public class UserSearchDialog extends DialogFragment
     private XmppConnectionService listeningTo;
     // the accounts whose directories were searched when the accounts last changed
     private List<Account> searchedAccounts;
-    // no directory can be searched because an account isn't connected
-    private boolean offline = false;
+    // why no directory can be searched although there may well be one, 0 otherwise
+    @StringRes private int unavailable = 0;
 
     public static UserSearchDialog newInstance(final String query) {
         final var dialog = new UserSearchDialog();
@@ -182,14 +183,22 @@ public class UserSearchDialog extends DialogFragment
 
     /** Whether 'Add contact' opens the search rather than the regular dialog. */
     public static boolean isAvailable(final XmppConnectionService service) {
-        return Iterables.any(service.getAccounts(), UserSearchDialog::isAvailable);
+        return isAvailable(service.getAccounts());
+    }
+
+    // disabled accounts have no say as long as there are others
+    @VisibleForTesting
+    static boolean isAvailable(final List<Account> accounts) {
+        final var enabled = Iterables.filter(accounts, Account::isEnabled);
+        return Iterables.any(
+                Iterables.isEmpty(enabled) ? accounts : enabled, UserSearchDialog::isAvailable);
     }
 
     // a server can't be asked whether it has a directory while the account isn't connected, so
     // only being connected to one that hasn't rules the search out
     @VisibleForTesting
     static boolean isAvailable(final Account account) {
-        return account.isEnabled() && (!account.isOnlineAndConnected() || isSearchable(account));
+        return !account.isOnlineAndConnected() || isSearchable(account);
     }
 
     private static boolean isSearchable(final Account account) {
@@ -487,17 +496,26 @@ public class UserSearchDialog extends DialogFragment
             return;
         }
         final var searchable = getSearchableAccounts(service);
-        final boolean offline =
-                searchable.isEmpty()
-                        && !Iterables.all(getAccounts(service), Account::isOnlineAndConnected);
-        if (searchable.equals(this.searchedAccounts) && offline == this.offline) {
+        final int unavailable = getUnavailableReason(getAccounts(service));
+        if (searchable.equals(this.searchedAccounts) && unavailable == this.unavailable) {
             return;
         }
         this.searchedAccounts = searchable;
-        this.offline = offline;
+        this.unavailable = unavailable;
         refreshDirectories(searchable);
         handler.removeCallbacks(searchRunnable);
         search();
+    }
+
+    @StringRes
+    private static int getUnavailableReason(final List<Account> accounts) {
+        if (accounts.isEmpty()) {
+            return R.string.this_account_is_disabled;
+        }
+        return Iterables.any(accounts, UserSearchDialog::isSearchable)
+                        || Iterables.all(accounts, Account::isOnlineAndConnected)
+                ? 0
+                : R.string.not_connected_try_again;
     }
 
     // picks up directories that came up after the account connected, and fetches the search forms
@@ -644,13 +662,14 @@ public class UserSearchDialog extends DialogFragment
                         searchContacts,
                         Iterables.concat(Iterables.filter(answers, Objects::nonNull)));
         // no directory will answer while offline, and it might only be for a moment
-        final var entries = merge(done && !offline ? found : Iterables.concat(found, preview));
+        final var entries =
+                merge(done && unavailable == 0 ? found : Iterables.concat(found, preview));
         // 'Load more' stays as it was while the results of the same term come in
         final boolean newTerm = !searchTerm.equals(shownTerm);
         shownTerm = searchTerm;
         adapter.setEntries(entries, searchShowsAccount, newTerm);
         binding.results.setVisibility(entries.isEmpty() ? View.GONE : View.VISIBLE);
-        if (entries.isEmpty() && done && !offline) {
+        if (entries.isEmpty() && done && unavailable == 0) {
             final boolean failed = !answers.isEmpty() && Iterables.all(answers, Objects::isNull);
             binding.status.setText(failed ? R.string.user_search_failed : R.string.no_users_found);
             binding.status.setVisibility(View.VISIBLE);
@@ -660,10 +679,10 @@ public class UserSearchDialog extends DialogFragment
     }
 
     private void showConnectionStatus() {
-        if (offline) {
-            binding.status.setText(R.string.not_connected_try_again);
+        if (unavailable != 0) {
+            binding.status.setText(unavailable);
         }
-        binding.status.setVisibility(offline ? View.VISIBLE : View.GONE);
+        binding.status.setVisibility(unavailable != 0 ? View.VISIBLE : View.GONE);
     }
 
     private static List<Entry> merge(final Iterable<Entry> found) {
