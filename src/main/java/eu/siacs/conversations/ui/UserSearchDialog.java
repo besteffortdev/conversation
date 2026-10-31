@@ -15,6 +15,7 @@ import android.view.ViewGroup;
 import android.widget.Toast;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
+import androidx.annotation.VisibleForTesting;
 import androidx.core.content.ContextCompat;
 import androidx.core.view.ViewCompat;
 import androidx.core.view.WindowCompat;
@@ -57,7 +58,8 @@ import java.util.Set;
  * hand) or picks several people, to invite into a conversation or to create a private group chat
  * with.
  */
-public class UserSearchDialog extends DialogFragment {
+public class UserSearchDialog extends DialogFragment
+        implements XmppConnectionService.OnAccountUpdate {
 
     private static final String QUERY_KEY = "query";
     private static final String CONVERSATION_KEY = "conversation";
@@ -74,6 +76,8 @@ public class UserSearchDialog extends DialogFragment {
 
     private final Handler handler = new Handler(Looper.getMainLooper());
     private final Runnable searchRunnable = this::search;
+    private final Runnable listenRunnable = this::listenToAccounts;
+    private final Runnable accountsRunnable = this::onAccountsChanged;
     private final ResultAdapter adapter = new ResultAdapter();
     // people picked so far, in the order they were picked
     private final Map<Jid, UserSearchManager.Result> selected = new LinkedHashMap<>();
@@ -97,6 +101,12 @@ public class UserSearchDialog extends DialogFragment {
     private List<Entry> preview = ImmutableList.of();
     // the term the results on screen match, null when there are none
     private String shownTerm;
+    // the service told about changes to the accounts, while this is started
+    private XmppConnectionService listeningTo;
+    // the accounts whose directories were searched when the accounts last changed
+    private List<Account> searchedAccounts;
+    // no directory can be searched because an account isn't connected
+    private boolean offline = false;
 
     public static UserSearchDialog newInstance(final String query) {
         final var dialog = new UserSearchDialog();
@@ -108,14 +118,14 @@ public class UserSearchDialog extends DialogFragment {
 
     /**
      * Opens the search for inviting people into the conversation (a group chat, or a 1:1 chat that
-     * becomes one) if the server of its account has a user directory.
+     * becomes one) unless the server of its account turned out to have no user directory.
      *
      * @return false if there is no directory to search; the caller falls back to {@link
      *     ChooseContactActivity}
      */
     public static boolean showInvite(final XmppActivity activity, final Conversation conversation) {
         final var account = conversation.getAccount();
-        if (!isSearchable(account)) {
+        if (!isAvailable(account)) {
             return false;
         }
         final var members = new ArrayList<String>();
@@ -142,15 +152,15 @@ public class UserSearchDialog extends DialogFragment {
     }
 
     /**
-     * Opens the search for choosing the participants of a new private group chat if the server of
-     * the account has a user directory.
+     * Opens the search for choosing the participants of a new private group chat unless the server
+     * of the account turned out to have no user directory.
      *
      * @return false if there is no directory to search; the caller falls back to {@link
      *     ChooseContactActivity}
      */
     public static boolean showCreateGroup(
             final XmppActivity activity, final Account account, final String name) {
-        if (!isSearchable(account)) {
+        if (!isAvailable(account)) {
             return false;
         }
         final var arguments = new Bundle();
@@ -170,14 +180,16 @@ public class UserSearchDialog extends DialogFragment {
         dialog.show(fragmentManager, PICKER_TAG);
     }
 
-    public static List<Account> getSearchableAccounts(final XmppConnectionService service) {
-        final var accounts = new ArrayList<Account>();
-        for (final var account : service.getAccounts()) {
-            if (isSearchable(account)) {
-                accounts.add(account);
-            }
-        }
-        return accounts;
+    /** Whether 'Add contact' opens the search rather than the regular dialog. */
+    public static boolean isAvailable(final XmppConnectionService service) {
+        return Iterables.any(service.getAccounts(), UserSearchDialog::isAvailable);
+    }
+
+    // a server can't be asked whether it has a directory while the account isn't connected, so
+    // only being connected to one that hasn't rules the search out
+    @VisibleForTesting
+    static boolean isAvailable(final Account account) {
+        return account.isEnabled() && (!account.isOnlineAndConnected() || isSearchable(account));
     }
 
     private static boolean isSearchable(final Account account) {
@@ -323,7 +335,6 @@ public class UserSearchDialog extends DialogFragment {
                     search();
                     return true;
                 });
-        refreshDirectories();
         final var query = requireArguments().getString(QUERY_KEY);
         if (savedInstanceState == null && !Strings.isNullOrEmpty(query)) {
             binding.search.append(query);
@@ -339,6 +350,7 @@ public class UserSearchDialog extends DialogFragment {
     @Override
     public void onStart() {
         super.onStart();
+        listenToAccounts();
         final var dialog = getDialog();
         final var window = dialog == null ? null : dialog.getWindow();
         if (window == null) {
@@ -357,6 +369,17 @@ public class UserSearchDialog extends DialogFragment {
             window.setNavigationBarColor(Color.TRANSPARENT);
             insetsController.setAppearanceLightNavigationBars(lightMode);
         }
+    }
+
+    @Override
+    public void onStop() {
+        handler.removeCallbacks(listenRunnable);
+        handler.removeCallbacks(accountsRunnable);
+        if (listeningTo != null) {
+            listeningTo.removeOnAccountListChangedListener(this);
+            listeningTo = null;
+        }
+        super.onStop();
     }
 
     @Override
@@ -383,12 +406,8 @@ public class UserSearchDialog extends DialogFragment {
         if (term.isEmpty()) {
             showContacts();
             binding.progress.setVisibility(View.INVISIBLE);
-            binding.status.setVisibility(View.GONE);
+            showConnectionStatus();
             binding.manualAddress.setVisibility(View.VISIBLE);
-            if (isPicker() && getService() == null) {
-                // restored after a configuration change; the service will be back shortly
-                handler.postDelayed(searchRunnable, SEARCH_DELAY);
-            }
         } else {
             binding.manualAddress.setVisibility(View.GONE);
             binding.progress.setVisibility(View.VISIBLE);
@@ -407,7 +426,7 @@ public class UserSearchDialog extends DialogFragment {
                 shownTerm = term;
                 adapter.setEntries(entries, adapter.showsAccount(), true);
                 binding.results.setVisibility(entries.isEmpty() ? View.GONE : View.VISIBLE);
-                binding.status.setVisibility(View.GONE);
+                showConnectionStatus();
             }
             handler.postDelayed(searchRunnable, SEARCH_DELAY);
         }
@@ -424,26 +443,67 @@ public class UserSearchDialog extends DialogFragment {
         return value != null && value.toLowerCase(Locale.ROOT).contains(needle);
     }
 
-    // the accounts whose directories are searched
+    // the accounts this is for, connected or not
     private List<Account> getAccounts(final XmppConnectionService service) {
         if (isPicker()) {
             final var account =
                     service.findAccountByJid(Jid.of(requireArguments().getString(ACCOUNT_KEY)));
-            return account != null && isSearchable(account)
+            return account != null && account.isEnabled()
                     ? ImmutableList.of(account)
                     : ImmutableList.of();
         }
-        return getSearchableAccounts(service);
+        return ImmutableList.copyOf(Iterables.filter(service.getAccounts(), Account::isEnabled));
+    }
+
+    // the accounts whose directories are searched
+    private List<Account> getSearchableAccounts(final XmppConnectionService service) {
+        return ImmutableList.copyOf(
+                Iterables.filter(getAccounts(service), UserSearchDialog::isSearchable));
+    }
+
+    private void listenToAccounts() {
+        final var service = getService();
+        if (service == null) {
+            // restored after a configuration change; the service will be back shortly
+            handler.postDelayed(listenRunnable, SEARCH_DELAY);
+            return;
+        }
+        service.setOnAccountListChangedListener(this);
+        listeningTo = service;
+        onAccountsChanged();
+    }
+
+    @Override
+    public void onAccountUpdate() {
+        // called from the threads of the connections, and for much more than a change of status
+        handler.removeCallbacks(accountsRunnable);
+        handler.post(accountsRunnable);
+    }
+
+    // the search starts over when an account connects or goes away while it is open
+    private void onAccountsChanged() {
+        final var service = listeningTo;
+        if (service == null) {
+            return;
+        }
+        final var searchable = getSearchableAccounts(service);
+        final boolean offline =
+                searchable.isEmpty()
+                        && !Iterables.all(getAccounts(service), Account::isOnlineAndConnected);
+        if (searchable.equals(this.searchedAccounts) && offline == this.offline) {
+            return;
+        }
+        this.searchedAccounts = searchable;
+        this.offline = offline;
+        refreshDirectories(searchable);
+        handler.removeCallbacks(searchRunnable);
+        search();
     }
 
     // picks up directories that came up after the account connected, and fetches the search forms
     // so that the first search doesn't wait for them
-    private void refreshDirectories() {
-        if (!(getActivity() instanceof XmppActivity activity)
-                || activity.xmppConnectionService == null) {
-            return;
-        }
-        for (final var account : getAccounts(activity.xmppConnectionService)) {
+    private static void refreshDirectories(final List<Account> accounts) {
+        for (final var account : accounts) {
             account.getXmppConnection().getManager(UserSearchManager.class).refresh();
         }
     }
@@ -470,8 +530,7 @@ public class UserSearchDialog extends DialogFragment {
         }
         final var service = activity.xmppConnectionService;
         if (service == null) {
-            // restored after a configuration change; the service will be back shortly
-            handler.postDelayed(searchRunnable, SEARCH_DELAY);
+            // listenToAccounts() comes back here along with the service
             return;
         }
         if (term.isEmpty()) {
@@ -479,9 +538,10 @@ public class UserSearchDialog extends DialogFragment {
             if (isPicker()) {
                 showContacts();
             }
+            showConnectionStatus();
             return;
         }
-        final var accounts = getAccounts(service);
+        final var accounts = getSearchableAccounts(service);
         final var contacts = findContacts(term);
         // a search again for the same term (the keyboard's search key) replaces the one before
         final int generation = ++this.generation;
@@ -583,19 +643,27 @@ public class UserSearchDialog extends DialogFragment {
                 Iterables.concat(
                         searchContacts,
                         Iterables.concat(Iterables.filter(answers, Objects::nonNull)));
-        final var entries = merge(done ? found : Iterables.concat(found, preview));
+        // no directory will answer while offline, and it might only be for a moment
+        final var entries = merge(done && !offline ? found : Iterables.concat(found, preview));
         // 'Load more' stays as it was while the results of the same term come in
         final boolean newTerm = !searchTerm.equals(shownTerm);
         shownTerm = searchTerm;
         adapter.setEntries(entries, searchShowsAccount, newTerm);
         binding.results.setVisibility(entries.isEmpty() ? View.GONE : View.VISIBLE);
-        if (entries.isEmpty() && done) {
-            final boolean failed = Iterables.all(answers, Objects::isNull);
+        if (entries.isEmpty() && done && !offline) {
+            final boolean failed = !answers.isEmpty() && Iterables.all(answers, Objects::isNull);
             binding.status.setText(failed ? R.string.user_search_failed : R.string.no_users_found);
             binding.status.setVisibility(View.VISIBLE);
         } else {
-            binding.status.setVisibility(View.GONE);
+            showConnectionStatus();
         }
+    }
+
+    private void showConnectionStatus() {
+        if (offline) {
+            binding.status.setText(R.string.not_connected_try_again);
+        }
+        binding.status.setVisibility(offline ? View.VISIBLE : View.GONE);
     }
 
     private static List<Entry> merge(final Iterable<Entry> found) {
