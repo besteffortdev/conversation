@@ -1724,8 +1724,22 @@ public class EditAccountActivity extends OmemoActivity
             binding.accountJidLayout.setHint(hint);
         }
         binding.accountJidLayout.setExpandedHintEnabled(false);
-        binding.accountJidLayout.setSuffixText(username ? "@" + mManagedDomain : null);
+        if (username) {
+            binding.accountJidLayout.setSuffixText("@" + mManagedDomain);
+        } else if (binding.accountJidLayout.getSuffixText() != null) {
+            clearManagedDomainSuffix();
+        }
         binding.namePort.setVisibility(mShowOptions && !username ? View.VISIBLE : View.GONE);
+    }
+
+    /**
+     * A cleared suffix isn't measured again, and {@link TextInputLayout} keeps room for its last
+     * width once the error icon shows: a full address would be cut off beside an empty gap.
+     */
+    private void clearManagedDomainSuffix() {
+        final int noSize = View.MeasureSpec.makeMeasureSpec(0, View.MeasureSpec.EXACTLY);
+        binding.accountJidLayout.getSuffixTextView().measure(noSize, noSize);
+        binding.accountJidLayout.setSuffixText(null);
     }
 
     /** Fields the MDM sets (see {@link AppConfig}) are shown, not editable. */
